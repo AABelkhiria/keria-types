@@ -13,7 +13,7 @@
 //! not reproducible from the pinned checkout. These Rust records are therefore curated against the
 //! generated TypeScript, and `fixtures/types-keria-api/v1.json` pins that file's exact structure,
 //! extracted from it by the TypeScript compiler, so a drift becomes a failing test rather than a
-//! silent incompatibility. See `docs/adr/0012-keria-api-record-types.md`.
+//! silent incompatibility.
 //!
 //! # Decoding
 //!

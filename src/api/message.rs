@@ -16,8 +16,8 @@
 //!
 //! The schema splits each message into a `_V_1` and a `_V_2` shape. Every pair is either identical
 //! or differs only by additional optional fields, so one Rust record covers both: a KERI 2 document
-//! decodes and re-encodes without losing the fields KERI 1 does not have. The `PORTING.md` §5.12
-//! ledger records the pairing. Nothing here interprets a version string; that is
+//! decodes and re-encodes without losing the fields KERI 1 does not have. Nothing here interprets
+//! a version string; that belongs to the KERI serialization layer, such as signify-rs's
 //! `signify-keri::serialization`.
 
 use core::fmt;
@@ -96,7 +96,7 @@ ilk_marker!(RevocationIlk, "rev", "TEL credential revocation, ilk `rev`.");
 /// The schema writes a threshold three ways: a single value such as `"1"` or `"1/2"`, one clause of
 /// weights, or several clauses. A key state declares only the first two forms and a key event all
 /// three; this one type covers both positions, which is a deliberate widening of the key-state
-/// field recorded in `PORTING.md` §9. Weights stay as written — reducing a rational and deciding
+/// field. Weights stay as written — reducing a rational and deciding
 /// whether a threshold is satisfied is `signify-keri::threshold`, which owns exact arithmetic.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(untagged)]
@@ -365,7 +365,7 @@ pub struct RotationRecord<K = RotationIlk> {
     /// writes `bt: _toad` — a bare **number** — whenever the threshold is non-zero and fits in
     /// thirty-two bits, falling back to `_toad.toString(16)` only at zero. So a rotation of the
     /// same identifier whose inception carried `"bt":"3"` carries `"bt":3`. Both are read here and
-    /// both are kept as the text that arrived; see `PORTING.md` §9 (Roadmap 8.4).
+    /// both are kept as the text that arrived.
     #[serde(rename = "bt", deserialize_with = "deserialize_witness_threshold")]
     pub witness_threshold: String,
     /// Witness prefixes cut by this rotation, wire label `br`.
@@ -658,7 +658,7 @@ impl Serialize for KeyEvent {
 /// The reference's `rotate` chooses between the two by value — see [`RotationRecord`] — so a
 /// reader that accepts only one of them cannot decode half the rotations the reference emits. The
 /// number is rendered as the decimal it was written as rather than converted to hexadecimal,
-/// because what a number on the wire *means* is the open question Roadmap 8.4 records: an
+/// because what a number on the wire *means* is still an open question: an
 /// inception's `bt` is hexadecimal text and a rotation's is a decimal number, and the two are the
 /// same field.
 fn deserialize_witness_threshold<'de, D: Deserializer<'de>>(deserializer: D) -> Result<String, D::Error> {

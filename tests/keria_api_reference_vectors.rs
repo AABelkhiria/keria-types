@@ -34,7 +34,7 @@ const FIXTURE: &str = include_str!("../fixtures/types-keria-api/v1.json");
 
 /// Documents this port and the reference deliberately decide differently.
 ///
-/// Each is explained in `fixtures/types-keria-api/README.md` and `PORTING.md` §9. The list is
+/// Each is explained in `fixtures/types-keria-api/README.md`. The list is
 /// asserted exactly, so a new disagreement cannot appear unnoticed.
 const EXPECTED_DIVERGENCES: [(&str, bool, bool); 14] = [
     ("key_state_unknown_field", false, true),
@@ -359,7 +359,7 @@ fn the_fixture_records_the_pinned_baseline_and_how_it_was_made() -> Result<(), B
             .any(|source| source == "src/keri/core/keyState.ts")
     );
 
-    // The `PORTING.md` §10 question this item closes: there is no OpenAPI revision to pin, because
+    // There is no OpenAPI revision to pin, because
     // the upstream generator fetches the document from a live agent and checks in nothing.
     assert_eq!(fixture.generation.upstream_command, "node scripts/generate-types.js");
     assert_eq!(fixture.generation.upstream_spec_url, "http://localhost:3902/spec.yaml");
@@ -834,7 +834,7 @@ fn walk(shape: &Shape, named: &mut BTreeSet<String>, other: &mut BTreeSet<String
 /// Fields the schema requires that this port makes optional, with the reason.
 ///
 /// Both belong to the KERI 1 spelling of an exchange message and have no counterpart in the KERI 2
-/// spelling, which one Rust record covers. `PORTING.md` §9 records the collapse.
+/// spelling, which one Rust record covers.
 const VERSION_COLLAPSED_FIELDS: [(&str, &str); 2] = [("EXN_V_1", "rp"), ("EXN_V_1", "e")];
 
 #[test]

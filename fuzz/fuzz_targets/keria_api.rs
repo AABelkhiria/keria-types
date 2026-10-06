@@ -42,9 +42,8 @@ macro_rules! round_trip {
                 // `i64`/`u64` lands in a captured open field as an `f64`, and `serde_json` writes
                 // a shortest form that reparses one unit in the last place away — so
                 // `{"extra":133333333303333333333333}` becomes `1.3333333330333333e+23` and then
-                // `1.3333333330333332e+23`. `PORTING.md` §10 records it and
-                // `signify-types`'s `a_large_captured_number_loses_a_unit_in_the_last_place` pins
-                // the exact behaviour. Everything from the second encoding onward is stable.
+                // `1.3333333330333332e+23`. The unit test
+                // `a_large_captured_number_loses_a_unit_in_the_last_place` pins the exact behaviour. Everything from the second encoding onward is stable.
                 let settled = to_json_string(&again).expect("re-encoding must succeed");
                 let once_more: $record =
                     from_json_slice(settled.as_bytes()).expect("a settled record must decode again");
@@ -101,8 +100,8 @@ fuzz_target!(|data: &[u8]| {
         9 => round_trip!(Oobi, body),
         10 => round_trip!(AcdcRecord, body),
         11 => round_trip!(AgentConfig, body),
-        // Added by Roadmap 6.10, the first item to make this record a trust boundary: it is the
-        // whole response of `Schemas.get`, and its `properties` map is open JSON Schema.
+        // This record is a trust boundary: it is the whole response of `Schemas.get`, and its
+        // `properties` map is open JSON Schema.
         12 => round_trip!(Schema, body),
         _ => round_trip!(keria_types::api::ExchangeEmbeds, body),
     };

@@ -10,8 +10,8 @@
 //! than. Each slot therefore checks the ilk it decoded, so a rotation arriving in the `icp` slot is
 //! a typed failure rather than a message a caller reads as an inception.
 //!
-//! Routes and route-specific payload shapes are not modelled here: the typed route table is Roadmap
-//! 8.1, which owns the multisig and IPEX route constants and the guards upstream writes by hand.
+//! Routes and route-specific payload shapes are not modelled here: the route table, with the multisig
+//! and IPEX route constants, belongs to the client that uses these records.
 
 use serde::de;
 use serde::{Deserialize, Deserializer, Serialize};

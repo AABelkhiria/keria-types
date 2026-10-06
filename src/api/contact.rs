@@ -334,7 +334,7 @@ mod tests {
 
     /// A captured number too large for `i64`/`u64` does **not** survive its first re-encoding.
     ///
-    /// Discovered by Roadmap 6.10's fuzz run. An undeclared field holding
+    /// Discovered by fuzzing. An undeclared field holding
     /// `133333333303333333333333` lands here as an `f64`, and `serde_json` writes a shortest form
     /// that reparses one unit in the last place away. From the *second* encoding onward it is a
     /// fixed point, which is the invariant the fuzz target asserts.
@@ -342,8 +342,8 @@ mod tests {
     /// This qualifies the round-trip guarantee for every record with a captured open field —
     /// [`Contact`], `ExternState`, `NotificationData`, `AcdcAttributes`, and `Schema.properties`.
     /// It is pinned rather than fixed because fixing it means `serde_json`'s `arbitrary_precision`,
-    /// which changes number handling across the workspace and collides with ADR `0008`'s
-    /// deliberately narrowed number space. `PORTING.md` §10 owns the decision.
+    /// which changes number handling for every crate in the build and widens the deliberately
+    /// narrowed number space this crate decodes.
     #[test]
     fn a_large_captured_number_loses_a_unit_in_the_last_place() -> Result<(), Box<dyn Error>> {
         let body = r#"{"id":"E","extra":133333333303333333333333}"#;

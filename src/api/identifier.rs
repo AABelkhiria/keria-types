@@ -166,8 +166,8 @@ impl KeyManagerState {
 /// A witness index as an agent writes it.
 ///
 /// The reference's generated schema declares `windexes` a `string[]`, and a live KERIA 1.0.1
-/// writes JSON numbers — `"windexes": [0, 1, 2]` — found by Roadmap 9.2c's wave 4, the first time
-/// a *witnessed* identifier's record ever reached this decoder from a real agent; every checked-in
+/// writes JSON numbers — `"windexes": [0, 1, 2]` — found the first time a *witnessed*
+/// identifier's record reached this decoder from a real agent; every checked-in
 /// fixture carries the empty list, where the two spellings cannot disagree. The reference never
 /// notices, because it casts the record instead of decoding it. Both spellings are accepted here
 /// and neither is rewritten into the other, exactly as
@@ -471,8 +471,8 @@ mod tests {
     fn witness_indexes_keep_the_spelling_they_arrived_as() -> Result<(), Box<dyn Error>> {
         // A live KERIA 1.0.1 writes numbers, the reference's generated schema declares strings,
         // and every checked-in fixture carries the empty list where the two cannot disagree —
-        // found by Roadmap 9.2c's wave 4, the first witnessed record to reach this decoder from a
-        // real agent. Both decode, and each re-encodes as it arrived.
+        // found with the first witnessed record to reach this decoder from a real agent. Both
+        // decode, and each re-encodes as it arrived.
         let numeric = PENDING_SOURCE.replace(r#""windexes":[]"#, r#""windexes":[0,1,2]"#);
         let hab: Hab = serde_json::from_str(&numeric)?;
         assert_eq!(

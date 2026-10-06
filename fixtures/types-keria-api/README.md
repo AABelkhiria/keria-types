@@ -8,17 +8,19 @@
   `scripts/generate-types.js`, `test/app/test-utils.ts`, `test/app/registry.test.ts`
 - Binary fields: none. Every value is JSON.
 
-Generate and verify from the repository root — no build step is needed, because nothing is
-executed:
+## Frozen snapshot
 
-```bash
-node tools/reference-vectors/types_keria_api.mjs --write   # regenerate
-node tools/reference-vectors/types_keria_api.mjs --check   # verify determinism
-```
+This file is a frozen snapshot. It was generated in signify-rs by
+`tools/reference-vectors/types_keria_api.mjs`, which ran the TypeScript compiler over the pinned
+signify-ts sources. That generator was not carried over to keria-types, so the file can no longer be
+regenerated here.
+
+signify-ts is not treated as an exact reference for these types. The snapshot stays as a starting point
+until fixtures derived from KERIA itself and from keripy replace it.
 
 ## Why this fixture is different
 
-Every other generator here calls a function and records what it returns.
+In signify-rs, every other generator called a function and recorded what it returned.
 `src/types/keria-api-schema.ts` declares *types*, which do not exist at run time and cannot be
 called. The reference for this module is therefore the TypeScript compiler itself, used two ways.
 
@@ -48,9 +50,7 @@ There isn't one. Upstream generates `keria-api-schema.ts` with
 agent**. That document is checked in nowhere in the pinned repository, carries no revision, and
 cannot be fetched from the pinned checkout. The generated TypeScript is therefore the pinned
 artifact and the only reproducible source, which is why these Rust records are curated against it
-rather than regenerated from the schema it came from. `docs/adr/0012-keria-api-record-types.md`
-records the decision; it closes the `PORTING.md` §10 "KERIA OpenAPI source revision/generator"
-question with the finding that no such revision exists to pin.
+rather than regenerated from the schema it came from: no revision of that document exists to pin.
 
 ## What the two verdicts show
 
@@ -110,7 +110,6 @@ Two systemic effects fall out of that and explain most of the divergence table:
   operation carries a response or an error. Both refuse it.
 
 These are recorded because they are the only KERIA-shaped documents in the pinned repository, and
-their looseness is the reason this port follows the schema rather than the mocks. A live-deployment
-check belongs to Roadmap 9.2.
+their looseness is the reason this port follows the schema rather than the mocks.
 
 Rust tests consume the checked-in fixture and require neither Node nor network access.

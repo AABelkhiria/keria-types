@@ -325,7 +325,7 @@ impl EchoedSequence {
 /// case passes — and a live KERIA 1.0.1 echoes that seal back unchanged, while the reference's
 /// generated schema and this crate's other operation families spell an anchor `{pre, sn, d}`.
 /// Typing the field as [`Anchor`] alone made every live anchor-query answer undecodable — found
-/// by Roadmap 9.2c's wave 10, the first anchor query ever driven against a deployment. Both
+/// with the first anchor query driven against a live deployment. Both
 /// shapes are accepted and neither is rewritten into the other; they are disjoint, since one
 /// requires `pre` and `sn` and the other requires `s`.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -341,8 +341,8 @@ pub enum EchoedAnchor {
 ///
 /// The agent copies the request into this record verbatim, so exactly the fields the caller sent
 /// come back: a sequence query carries `sn` and no `anchor`, an anchor query carries `anchor` and
-/// **no `sn`** — which is why both are optional, found live by Roadmap 9.2c's wave 10 after the
-/// required `sn` refused the first anchor-query answer.
+/// **no `sn`** — which is why both are optional, found live when a required `sn` refused the
+/// first anchor-query answer.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct QueryMetadata {
     /// Identifier prefix being queried.
@@ -633,8 +633,8 @@ mod tests {
 
     #[test]
     fn an_anchor_query_echoes_the_callers_seal_and_no_sequence() -> Result<(), Box<dyn Error>> {
-        // The exact shape a live KERIA 1.0.1 answered the first anchor query ever driven against
-        // a deployment — Roadmap 9.2c's wave 10. The metadata is the caller's request copied
+        // The exact shape a live KERIA 1.0.1 answered the first anchor query driven against a
+        // deployment. The metadata is the caller's request copied
         // verbatim: the anchor is the caller's own `{i, s, d}` seal, not the schema's
         // `{pre, sn, d}` shape, and there is no `sn` at all. Typing `anchor` as `Anchor` alone
         // and `sn` as required made this body undecodable.
