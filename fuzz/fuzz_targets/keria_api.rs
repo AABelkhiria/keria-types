@@ -10,12 +10,11 @@
 //! errors, that anything accepted re-encodes into something that decodes to an equal value, and
 //! that the byte bound is enforced before any parsing happens.
 
-use libfuzzer_sys::fuzz_target;
 use keria_types::api::{
-    AcdcRecord, AgentConfig, ApiError, Contact, Credential, Hab, KeyEvent, KeyState, MAX_DOCUMENT_BYTES,
-    Notification, Oobi, Registry, Schema, Threshold, UntypedOperation, from_json_slice,
-    from_json_slice_with_limit, to_json_string,
+    AcdcRecord, AgentConfig, ApiError, Contact, Credential, Hab, KeyEvent, KeyState, MAX_DOCUMENT_BYTES, Notification,
+    Oobi, Registry, Schema, Threshold, UntypedOperation, from_json_slice, from_json_slice_with_limit, to_json_string,
 };
+use libfuzzer_sys::fuzz_target;
 
 /// Returns whether a rejection is one of the variants this crate is allowed to produce.
 fn is_expected(error: &ApiError) -> bool {
@@ -37,8 +36,7 @@ macro_rules! round_trip {
         match from_json_slice::<$record>($body) {
             Ok(record) => {
                 let encoded = to_json_string(&record).expect("a decoded record must encode");
-                let again: $record =
-                    from_json_slice(encoded.as_bytes()).expect("an encoded record must decode again");
+                let again: $record = from_json_slice(encoded.as_bytes()).expect("an encoded record must decode again");
                 // The *second* encoding is a fixed point, which is the invariant that actually
                 // holds. The first is not, for one recorded reason: a JSON integer too large for
                 // `i64`/`u64` lands in a captured open field as an `f64`, and `serde_json` writes
@@ -135,7 +133,10 @@ fuzz_target!(|data: &[u8]| {
         let done = operation.outcome.is_done();
         let response = operation.outcome.response().is_some();
         let error = operation.outcome.error().is_some();
-        assert!(!(response && error), "an operation reported both a result and a failure");
+        assert!(
+            !(response && error),
+            "an operation reported both a result and a failure"
+        );
         assert_eq!(done, response || error);
     }
 });
