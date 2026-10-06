@@ -550,7 +550,7 @@ pub struct RevocationRecord {
 /// receipt or a reply arriving where a key event is expected is a typed failure.
 ///
 /// ```
-/// use signify_types::api::KeyEvent;
+/// use keria_types::api::KeyEvent;
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// let body = br#"{"v":"KERI10JSON0000cb_","t":"ixn","d":"EABC","i":"EDEF","s":"1","p":"EGHI","a":[]}"#;
@@ -622,7 +622,7 @@ impl KeyEvent {
     /// Returns the sequence number exactly as the message spells it.
     ///
     /// KERI writes this as lowercase hexadecimal without a prefix; parsing it is
-    /// `signify-cesr::number`.
+    /// `keri_cesr::number`.
     #[must_use]
     pub fn sequence_number(&self) -> &str {
         match self {

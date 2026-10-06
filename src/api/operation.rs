@@ -98,7 +98,7 @@ impl<R> OperationOutcome<R> {
 /// `M` is the family's metadata and `R` its successful result; the type aliases below fix both.
 ///
 /// ```
-/// use signify_types::api::{KeyEvent, Operation, OperationOutcome, WitnessMetadata};
+/// use keria_types::api::{KeyEvent, Operation, OperationOutcome, WitnessMetadata};
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// let body = br#"{"name":"witness.EABC","metadata":{"pre":"EABC","sn":0},"done":false}"#;
@@ -295,8 +295,8 @@ pub struct OobiMetadata {
 /// exactly as it was written.
 ///
 /// No numeric accessor is offered for [`Self::Text`]: the base of an echoed string is the
-/// caller's choice, not something this type can recover. See
-/// [`QuerySequence`](../../../signify_client/endpoint/key_states/enum.QuerySequence.html).
+/// caller's choice, not something this type can recover. See signify-rs's
+/// `signify_client::endpoint::key_states::QuerySequence`.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum EchoedSequence {

@@ -4,12 +4,12 @@
 //! survives a round trip, what a document can and cannot make the decoder believe, and that hostile
 //! input is always a typed error.
 
-use proptest::prelude::*;
-use serde_json::{Map, Value, json};
-use signify_types::api::{
+use keria_types::api::{
     ApiError, Contact, Hab, KeyEvent, KeyManagerState, KeyState, MAX_DOCUMENT_BYTES, OperationOutcome, Role, Threshold,
     UntypedOperation, WitnessOperation, from_json_slice, to_json_string,
 };
+use proptest::prelude::*;
+use serde_json::{Map, Value, json};
 
 /// The pinned agent key state, which every key-state property starts from.
 fn key_state() -> Value {
@@ -259,7 +259,7 @@ proptest! {
             // The same document read without a family narrows back to it.
             let untyped: UntypedOperation = decode(&document)?;
             let narrowed = untyped
-                .into_typed::<signify_types::api::WitnessMetadata, KeyEvent>()
+                .into_typed::<keria_types::api::WitnessMetadata, KeyEvent>()
                 .is_ok();
             prop_assert!(narrowed, "an untyped operation would not narrow to its own family");
         }

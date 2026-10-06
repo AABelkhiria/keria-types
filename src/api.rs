@@ -23,7 +23,7 @@
 //! directly.
 //!
 //! ```
-//! use signify_types::api::{KeyState, from_json_slice};
+//! use keria_types::api::{KeyState, from_json_slice};
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let body = br#"{"vn":[1,0],"i":"EEXekkGu9IAzav6pZVJhkLnjtjM5v3AcyA-pdKUcaGei","s":"0","p":"",

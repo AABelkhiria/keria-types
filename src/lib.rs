@@ -4,7 +4,7 @@
 //! with an edge signer, curated from the pinned reference's generated
 //! `src/types/keria-api-schema.ts` and its hand-written `src/keri/core/keyState.ts` wrapper. It
 //! performs no cryptography, builds no KERI events, and knows nothing about HTTP or endpoint
-//! paths: those belong to `signify-crypto`, `signify-keri`, and `signify-http` respectively.
+//! paths: those belong to the crates that use it, such as `keri-cesr` and signify-rs.
 //!
 //! Everything lives under [`api`].
 //!

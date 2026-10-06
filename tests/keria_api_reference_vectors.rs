@@ -14,11 +14,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
 
-use serde::Deserialize;
-use serde::de::DeserializeOwned;
-use serde_json::Value;
-use signify_types::api::credential::{BackedCredentialStatus, RegistryEventKind, UnbackedCredentialStatus};
-use signify_types::api::{
+use keria_types::api::credential::{BackedCredentialStatus, RegistryEventKind, UnbackedCredentialStatus};
+use keria_types::api::{
     AcceptedHab, AcdcAttributes, AcdcRecord, AgentConfig, AgentResourceResult, AidRecord, Anchor, Challenge, Contact,
     Controller, Credential, CredentialState, DoneOperation, EmptyObject, EndRole, EstablishmentState, ExchangeEmbeds,
     ExchangeRecord, ExchangeResource, GroupMember, Hab, IssuanceEvent, IssuanceKind, KeyEvent, KeyEventRecord,
@@ -27,10 +24,13 @@ use signify_types::api::{
     RevocationRecord, Role, SaltyState, Schema, Seal, UntypedOperation, WellKnown, WitnessOperation, from_json_slice,
     message,
 };
-use signify_types::api::{Registry, to_json_string};
+use keria_types::api::{Registry, to_json_string};
+use serde::Deserialize;
+use serde::de::DeserializeOwned;
+use serde_json::Value;
 
 const REFERENCE_SHA: &str = "91a04a5edd804425f42be75ffbf034f8d14e5cb2";
-const FIXTURE: &str = include_str!("../../../fixtures/types-keria-api/v1.json");
+const FIXTURE: &str = include_str!("../fixtures/types-keria-api/v1.json");
 
 /// Documents this port and the reference deliberately decide differently.
 ///
@@ -364,7 +364,7 @@ fn the_fixture_records_the_pinned_baseline_and_how_it_was_made() -> Result<(), B
     assert_eq!(fixture.generation.upstream_command, "node scripts/generate-types.js");
     assert_eq!(fixture.generation.upstream_spec_url, "http://localhost:3902/spec.yaml");
     assert!(!fixture.generation.upstream_spec_checked_in);
-    assert!(!fixture.generation.note.is_empty());
+    assert_ne!(fixture.generation.note, "");
     Ok(())
 }
 
@@ -786,14 +786,14 @@ fn the_operation_union_is_usable_only_for_a_literal() -> Result<(), Box<dyn Erro
     assert!(untyped.clone().into_typed::<WitnessMetadataAlias, KeyEvent>().is_ok());
     assert!(
         untyped
-            .into_typed::<signify_types::api::OobiMetadata, KeyState>()
+            .into_typed::<keria_types::api::OobiMetadata, KeyState>()
             .is_err()
     );
     Ok(())
 }
 
 /// Named so the dispatch table above and this test read the same way.
-type WitnessMetadataAlias = signify_types::api::WitnessMetadata;
+type WitnessMetadataAlias = keria_types::api::WitnessMetadata;
 
 /// Returns whether a declared type admits `null`.
 fn admits_null(shape: &Shape) -> bool {

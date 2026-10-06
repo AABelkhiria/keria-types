@@ -1,24 +1,43 @@
 [package]
-name = "signify-types"
+name = "keria-types"
 version = "0.0.0"
-description = "Shared protocol and KERIA API data types for Signify"
-edition.workspace = true
-rust-version.workspace = true
-publish.workspace = true
-keywords.workspace = true
-categories.workspace = true
+description = "KERIA agent API record types"
+edition = "2024"
+rust-version = "1.97"
+publish = false
+license = "Apache-2.0 OR MIT"
+keywords = ["keri", "keria", "identity", "serde", "api"]
+categories = ["encoding", "data-structures"]
 
 [dependencies]
-serde.workspace = true
-serde_json.workspace = true
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = { version = "1.0.151", default-features = false, features = ["std"] }
 
 [dev-dependencies]
-criterion.workspace = true
-proptest.workspace = true
+criterion = { version = "0.8.2", default-features = false, features = ["cargo_bench_support"] }
+proptest = { version = "1.11.0", default-features = false, features = ["std"] }
 
 [[bench]]
 name = "keria_api"
 harness = false
 
-[lints]
-workspace = true
+[lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+unreachable_pub = "warn"
+unused_must_use = "deny"
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
+cargo = { level = "deny", priority = -1 }
+allow_attributes = "deny"
+dbg_macro = "deny"
+expect_used = "deny"
+indexing_slicing = "deny"
+panic = "deny"
+print_stderr = "deny"
+print_stdout = "deny"
+todo = "deny"
+unimplemented = "deny"
+unwrap_used = "deny"

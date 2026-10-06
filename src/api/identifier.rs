@@ -21,10 +21,9 @@ use super::key_state::KeyState;
 /// The security tier a salty key manager derives its keys under.
 ///
 /// This is the wire spelling KERIA stores in a salty identifier's state. The Argon2id cost profile
-/// it selects lives in `keri_cesr::crypto::salt::SecurityTier`, which this crate cannot reference:
-/// `ARCHITECTURE.md` §4.3 keeps `signify-types` free of workspace dependencies so every upper crate
-/// can depend on it. The two are converted where both are in scope, which is
-/// `signify-keri::manager` (Roadmap 4.2).
+/// it selects lives in `keri_cesr::crypto::salt::SecurityTier`, which this crate does not reference:
+/// `keria-types` depends only on serde, so any crate can depend on it. The two are converted where
+/// both are in scope, such as signify-rs's `signify-keri::manager`.
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
 pub enum KeyTier {
     /// Interactive profile.
@@ -224,7 +223,7 @@ pub struct PendingHab {
 /// One identifier record, accepted or still pending.
 ///
 /// ```
-/// use signify_types::api::{Hab, KeyManagerState};
+/// use keria_types::api::{Hab, KeyManagerState};
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// let body = br#"{"name":"group","prefix":"EGRP","icp_dt":"2023-12-01T10:05:25.062609+00:00",

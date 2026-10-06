@@ -17,7 +17,7 @@ use serde_json::{Map, Value};
 /// declares, in declaration order.
 ///
 /// ```
-/// use signify_types::api::Role;
+/// use keria_types::api::Role;
 ///
 /// assert_eq!(Role::Witness.as_str(), "witness");
 /// assert_eq!(Role::from("mailbox"), Role::Mailbox);

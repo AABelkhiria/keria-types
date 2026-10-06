@@ -35,7 +35,7 @@ pub struct EstablishmentState {
 /// The sequence number, first-seen ordinal, and witness threshold stay as text. KERI writes them as
 /// lowercase hexadecimal, but the pinned upstream tests declare key states whose `s`, `f`, `bt`, and
 /// `kt` are the empty string, so narrowing them to an integer here would refuse a document the
-/// reference accepts. Parsing them is `signify-cesr::number`.
+/// reference accepts. Parsing them is `keri_cesr::number`.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct KeyState {
     /// Protocol version as `[major, minor]`, wire label `vn`.
