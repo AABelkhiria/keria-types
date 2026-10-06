@@ -1,13 +1,16 @@
 [package]
 name = "keria-types"
-version = "0.0.0"
+version = "0.1.0"
 description = "KERIA agent API record types"
 edition = "2024"
 rust-version = "1.97"
-publish = false
 license = "Apache-2.0 OR MIT"
+repository = "https://github.com/AABelkhiria/keria-types"
+documentation = "https://docs.rs/keria-types"
+readme = "README.md"
 keywords = ["keri", "keria", "identity", "serde", "api"]
 categories = ["encoding", "data-structures"]
+exclude = [".github/", "deny.toml", "rustfmt.toml", "rust-toolchain.toml", ".gitignore"]
 
 [dependencies]
 serde = { version = "1.0.228", features = ["derive"] }
