@@ -220,6 +220,10 @@ pub struct AcdcRecord {
     #[serde(rename = "a", default, skip_serializing_if = "Option::is_none")]
     pub attributes: Option<AcdcAttributes>,
     /// Attribute aggregate, wire label `A`; the alternative to the block above.
+    ///
+    /// Passthrough content: `serde_json::Value` sorts object keys, so what is read from here may
+    /// not be in the field order the agent wrote. Anything digested — a seal re-anchored, an event
+    /// rebuilt — must come from the original bytes, not from this field.
     #[serde(rename = "A", default, skip_serializing_if = "Option::is_none")]
     pub aggregate: Option<Value>,
     /// Edge block linking to other credentials, wire label `e`.
@@ -270,6 +274,10 @@ pub struct InceptionRecord {
     #[serde(rename = "c")]
     pub configuration: Vec<String>,
     /// Anchored seals, wire label `a`; the schema types this `unknown`.
+    ///
+    /// Passthrough content: `serde_json::Value` sorts object keys, so what is read from here may
+    /// not be in the field order the agent wrote. Anything digested — a seal re-anchored, an event
+    /// rebuilt — must come from the original bytes, not from this field.
     #[serde(rename = "a")]
     pub anchors: Value,
 }
@@ -316,6 +324,10 @@ pub struct DelegatedInceptionRecord {
     #[serde(rename = "c")]
     pub configuration: Vec<String>,
     /// Anchored seals, wire label `a`; the schema types this `unknown`.
+    ///
+    /// Passthrough content: `serde_json::Value` sorts object keys, so what is read from here may
+    /// not be in the field order the agent wrote. Anything digested — a seal re-anchored, an event
+    /// rebuilt — must come from the original bytes, not from this field.
     #[serde(rename = "a")]
     pub anchors: Value,
     /// Delegator identifier prefix, wire label `di`.
@@ -378,6 +390,10 @@ pub struct RotationRecord<K = RotationIlk> {
     #[serde(rename = "c", default, skip_serializing_if = "Option::is_none")]
     pub configuration: Option<Vec<String>>,
     /// Anchored seals, wire label `a`; the schema types this `unknown`.
+    ///
+    /// Passthrough content: `serde_json::Value` sorts object keys, so what is read from here may
+    /// not be in the field order the agent wrote. Anything digested — a seal re-anchored, an event
+    /// rebuilt — must come from the original bytes, not from this field.
     #[serde(rename = "a")]
     pub anchors: Value,
 }
@@ -404,6 +420,10 @@ pub struct InteractionRecord {
     #[serde(rename = "p")]
     pub prior: String,
     /// Anchored seals, wire label `a`; the schema types this `unknown`.
+    ///
+    /// Passthrough content: `serde_json::Value` sorts object keys, so what is read from here may
+    /// not be in the field order the agent wrote. Anything digested — a seal re-anchored, an event
+    /// rebuilt — must come from the original bytes, not from this field.
     #[serde(rename = "a")]
     pub anchors: Value,
 }
@@ -432,6 +452,10 @@ pub struct ReplyRecord {
     #[serde(rename = "r")]
     pub route: String,
     /// Attribute block, wire label `a`; the schema types this `unknown`.
+    ///
+    /// Passthrough content: `serde_json::Value` sorts object keys, so what is read from here may
+    /// not be in the field order the agent wrote. Anything digested — a seal re-anchored, an event
+    /// rebuilt — must come from the original bytes, not from this field.
     #[serde(rename = "a")]
     pub attributes: Value,
 }
@@ -472,6 +496,10 @@ pub struct ExchangeRecord {
     #[serde(rename = "q")]
     pub modifiers: Map<String, Value>,
     /// Attribute block, wire label `a`; the schema types this `unknown`.
+    ///
+    /// Passthrough content: `serde_json::Value` sorts object keys, so what is read from here may
+    /// not be in the field order the agent wrote. Anything digested — a seal re-anchored, an event
+    /// rebuilt — must come from the original bytes, not from this field.
     #[serde(rename = "a")]
     pub attributes: Value,
     /// Embedded messages, wire label `e`; the KERI 1 shape.
