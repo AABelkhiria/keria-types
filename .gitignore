@@ -1,4 +1,16 @@
+# Cargo build output
 /target/
+
+# Fuzzing (cargo-fuzz)
+/fuzz/target/
 /fuzz/corpus/
 /fuzz/artifacts/
-/fuzz/target/
+
+# Rustfmt backups and coverage profiles
+*.rs.bk
+*.profraw
+
+# Editors and OS
+.DS_Store
+.idea/
+.vscode/
