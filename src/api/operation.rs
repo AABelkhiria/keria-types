@@ -296,6 +296,7 @@ pub struct OobiMetadata {
 /// required field, so the shapes cannot be mistaken for each other.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(untagged)]
+#[non_exhaustive]
 pub enum ResolvedOobi {
     /// The key state of the controller the OOBI introduced.
     KeyState(Box<KeyState>),
