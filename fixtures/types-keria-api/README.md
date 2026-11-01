@@ -28,8 +28,8 @@ called. The reference for this module is therefore the TypeScript compiler itsel
 file writes them — every field, whether it is optional, and the type it is written as — extracted
 from the syntax tree. `enums` holds the six enum declarations, `key_state_exports` the 78 aliases
 `keyState.ts` defines, and `key_state_functions` its two exported guards. A Rust test asserts its
-own model against this, so a schema drifting out from under the port becomes a failing test rather
-than a silent incompatibility.
+own model against this, so a schema drifting out from under a record a document exercises becomes a
+failing test rather than a silent incompatibility.
 
 **Documents are type-checked.** Each entry in `documents` is a JSON document checked against a named
 schema by the pinned compiler, twice:
@@ -76,6 +76,12 @@ Two systemic effects fall out of that and explain most of the divergence table:
 
 ## Documents recorded as safe Rust divergences
 
+- **An OOBI operation answering `{oobi}`, or submit metadata with `alias`.** The schema declares a key
+  state as the only response of an OOBI operation, and `{pre, sn}` as a submit operation's metadata.
+  KERIA also answers `{oobi}` to the first and writes `{alias, sn}` for the second, so Rust accepts
+  `{oobi}`, requires `alias` and refuses `{pre, sn}`. No document here is an OOBI or submit operation;
+  the tests in `src/api/operation.rs` cover both, and
+  `the_schema_still_declares_what_keria_does_not_send` notices the schema changing.
 - **A backed issuance or revocation with `ri`.** `IssEvent` declares `ri` for both `iss` and `bis`,
   and `REV_V_1` requires `ri` whatever its `t`. keripy's `backerIssue` writes `ii` and `ra` on `bis`,
   and its `backerRevoke` writes `ra` on `brv`, so Rust requires those and refuses a document with `ri`

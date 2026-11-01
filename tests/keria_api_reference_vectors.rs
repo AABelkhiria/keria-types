@@ -5,8 +5,8 @@
 //! evidence, and this file checks the Rust model against both.
 //!
 //! - The **declaration**, read from the pinned file's syntax tree: every schema, its fields, and
-//!   which of them are optional. The Rust records are asserted against it, so a schema drifting out
-//!   from under this port fails a test rather than producing a silent incompatibility.
+//!   which of them are optional. The records a document exercises are asserted against it, so a
+//!   schema drifting out from under them fails a test rather than producing a silent incompatibility.
 //! - The **verdicts** the pinned compiler returns for 82 documents. Each is decoded here with the
 //!   Rust type the fixture names, and the result compared with what the fixture records — including
 //!   the twelve documents the two implementations deliberately decide differently.
@@ -621,6 +621,34 @@ fn every_document_decodes_exactly_as_recorded() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
+fn the_schema_still_declares_what_keria_does_not_send() -> Result<(), Box<dyn Error>> {
+    let fixture: Value = serde_json::from_str(FIXTURE)?;
+    let field_names = |schema: &str| -> Vec<String> {
+        fixture
+            .pointer(&format!("/schemas/{schema}/fields"))
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(|field| field.get("name").and_then(Value::as_str).map(str::to_owned))
+            .collect()
+    };
+    assert_eq!(field_names("SubmitOperationMetadata"), ["pre", "sn"]);
+
+    let response = fixture
+        .pointer("/schemas/CompletedOOBIOperation/fields")
+        .and_then(Value::as_array)
+        .and_then(|fields| {
+            fields
+                .iter()
+                .find(|field| field.get("name") == Some(&"response".into()))
+        })
+        .and_then(|field| field.pointer("/type/name"))
+        .and_then(Value::as_str);
+    assert_eq!(response, Some("KeyStateRecord"));
+    Ok(())
+}
+
+#[test]
 fn a_status_sequence_decodes_only_as_the_number_keria_sends() -> Result<(), Box<dyn Error>> {
     let fixture = fixture()?;
     for name in STRING_STATUS_SEQUENCE {
@@ -845,7 +873,7 @@ fn the_operation_union_is_usable_only_for_a_literal() -> Result<(), Box<dyn Erro
     assert!(untyped.clone().into_typed::<WitnessMetadataAlias, KeyEvent>().is_ok());
     assert!(
         untyped
-            .into_typed::<keria_types::api::OobiMetadata, KeyState>()
+            .into_typed::<keria_types::api::OobiMetadata, keria_types::api::ResolvedOobi>()
             .is_err()
     );
     Ok(())

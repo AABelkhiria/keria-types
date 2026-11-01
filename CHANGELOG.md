@@ -32,6 +32,9 @@
   revocation proposal for a registry with backers failed to decode.
 - `OobiOperation` now completes with `ResolvedOobi`, not `KeyState`. KERIA answers `{oobi}` when it knows no controller
   for the OOBI, so resolving an OOBI for a credential schema failed to decode with ``missing field `i` ``.
+- `SubmitMetadata` is now a struct of `alias` and `sn`, not an alias of `LogPositionMetadata`. KERIA writes `alias` in
+  place of `pre`, so a real submit operation failed to decode with ``missing field `pre` ``. The schema's `{pre, sn}` is
+  now refused.
 - `DelegatorMetadata.anchor` is now `Option<KeyEvent>`, not `Option<Anchor>`. KERIA echoes the approving
   event there, usually an `ixn`, so a real delegator operation failed to decode with ``missing field `pre` ``.
 

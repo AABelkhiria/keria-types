@@ -255,8 +255,8 @@ impl UntypedOperation {
 
 /// Metadata naming a position in a key event log.
 ///
-/// The schema spells this shape four times, once per family — witness, delegation, group, and
-/// submit — with identical fields. The aliases below record the four names.
+/// The schema spells this shape once per family, with identical fields. The aliases below name it
+/// for the three families KERIA sends it on: witness, delegation and group.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct LogPositionMetadata {
     /// Identifier prefix whose log is being waited on.
@@ -271,8 +271,17 @@ pub type WitnessMetadata = LogPositionMetadata;
 pub type DelegationMetadata = LogPositionMetadata;
 /// Metadata of an operation waiting for a multisig group event.
 pub type GroupMetadata = LogPositionMetadata;
+
 /// Metadata of an operation waiting for an event to be submitted to witnesses.
-pub type SubmitMetadata = LogPositionMetadata;
+///
+/// KERIA writes `alias` here, although its schema declares `pre`.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct SubmitMetadata {
+    /// Name of the identifier whose event is being submitted.
+    pub alias: String,
+    /// Sequence number being submitted.
+    pub sn: u64,
+}
 
 /// Metadata of an operation resolving an OOBI.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -697,6 +706,20 @@ mod tests {
 
         // A response matching neither shape is refused rather than guessed at.
         assert!(serde_json::from_str::<ResolvedOobi>(r#"{"$id":"ESCH"}"#).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn a_submit_operation_names_the_identifier_by_its_alias() -> Result<(), Box<dyn Error>> {
+        let pending = r#"{"name":"submit.EABC","metadata":{"alias":"aid","sn":3},"done":false}"#;
+        let operation: SubmitOperation = serde_json::from_str(pending)?;
+        let metadata = operation.metadata.as_ref().ok_or("the operation carried no metadata")?;
+        assert_eq!(metadata.alias, "aid");
+        assert_eq!(metadata.sn, 3);
+        assert_eq!(serde_json::to_string(&operation)?, pending);
+
+        // The schema's `{pre, sn}` is never sent here.
+        assert!(serde_json::from_str::<SubmitMetadata>(r#"{"pre":"EABC","sn":3}"#).is_err());
         Ok(())
     }
 
