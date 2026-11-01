@@ -468,10 +468,10 @@ pub struct DoneMetadata {
     pub pre: Option<String>,
 }
 
-/// Metadata of an operation issuing or revoking a credential.
+/// Metadata of an operation issuing or verifying a credential.
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct CredentialMetadata {
-    /// The credential being issued, wire label `ced`.
+    /// The credential at stake, wire label `ced`.
     pub ced: AcdcRecord,
     /// The key-event operation this one is waiting on.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -578,7 +578,7 @@ pub type ExchangeOperation = Operation<ExchangeMetadata, ExchangeMetadata>;
 pub type SubmitOperation = Operation<SubmitMetadata, KeyState>;
 /// An operation that had already finished when it was created.
 pub type DoneOperation = Operation<DoneMetadata, KelResponse>;
-/// An operation that issues or revokes a credential.
+/// An operation that issues or verifies a credential.
 pub type CredentialOperation = Operation<CredentialMetadata, CredentialResponse>;
 /// An operation that waits for a multisig group event.
 pub type GroupOperation = Operation<GroupMetadata, KeyEvent>;
