@@ -281,6 +281,40 @@ pub struct OobiMetadata {
     pub oobi: String,
 }
 
+/// What an OOBI operation returns when it completes.
+///
+/// KERIA also answers `{oobi}`, although its schema declares only a key state. The two share no
+/// required field, so the shapes cannot be mistaken for each other.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(untagged)]
+pub enum ResolvedOobi {
+    /// The key state of the controller the OOBI introduced.
+    KeyState(Box<KeyState>),
+    /// The URL alone, when KERIA knows no controller for the OOBI, as with an OOBI for a credential
+    /// schema.
+    Url(OobiMetadata),
+}
+
+impl ResolvedOobi {
+    /// Returns the introduced controller's key state, if any.
+    #[must_use]
+    pub fn key_state(&self) -> Option<&KeyState> {
+        match self {
+            Self::KeyState(state) => Some(state),
+            Self::Url(_) => None,
+        }
+    }
+
+    /// Consumes the response, returning the introduced controller's key state, if any.
+    #[must_use]
+    pub fn into_key_state(self) -> Option<KeyState> {
+        match self {
+            Self::KeyState(state) => Some(*state),
+            Self::Url(_) => None,
+        }
+    }
+}
+
 /// A sequence number as an agent echoed it back.
 ///
 /// A query's metadata is not the agent's own description of what it is doing: KERIA copies the
@@ -513,8 +547,8 @@ pub enum KelMetadata {
     Done(Box<DoneMetadata>),
 }
 
-/// An operation that resolves an OOBI, returning the key state it discovered.
-pub type OobiOperation = Operation<OobiMetadata, KeyState>;
+/// An operation that resolves an OOBI, returning the controller's key state or the URL alone.
+pub type OobiOperation = Operation<OobiMetadata, ResolvedOobi>;
 /// An operation that queries another identifier's key state.
 pub type QueryOperation = Operation<QueryMetadata, KeyState>;
 /// An operation that authorizes an endpoint role, returning the reply that granted it.
@@ -549,6 +583,7 @@ mod tests {
     use super::*;
     use std::error::Error;
 
+    const KEY_STATE: &str = r#"{"vn":[1,0],"i":"EAB","s":"0","p":"","d":"EAB","f":"0","dt":"2023-08-19T21:04:57.948863+00:00","et":"dip","kt":"1","k":["DMZh_y-H5C3cSbZZST-fqnsmdNTReZxIh0t2xSTOJQ8a"],"nt":"1","n":["EM9M2EQNCBK0MyAhVYBvR98Q0tefpvHgE-lHLs82XgqC"],"bt":"0","b":[],"c":[],"ee":{"s":"0","d":"EAB","br":[],"ba":[]},"di":"ELI7pg979AdhmvrjDeam2eAO2SR5niCgnjAJXJHtJose"}"#;
     const PENDING: &str = r#"{"name":"witness.EABC","metadata":{"pre":"EABC","sn":0},"done":false}"#;
 
     #[test]
@@ -627,7 +662,41 @@ mod tests {
         let typed: WitnessOperation = untyped.clone().into_typed()?;
         assert_eq!(typed.metadata.map(|metadata| metadata.pre), Some("EABC".to_owned()));
         // The wrong family is a typed failure rather than a silent misreading.
-        assert!(untyped.into_typed::<OobiMetadata, KeyState>().is_err());
+        assert!(untyped.into_typed::<OobiMetadata, ResolvedOobi>().is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn an_oobi_operation_with_no_known_controller_returns_the_url() -> Result<(), Box<dyn Error>> {
+        let answer = r#"{"name":"oobi.E","metadata":{"oobi":"http://h/oobi/E"},"response":{"oobi":"http://h/oobi/E"},"done":true}"#;
+        let operation: OobiOperation = serde_json::from_str(answer)?;
+        let resolved = operation
+            .outcome
+            .response()
+            .ok_or("the operation carried no response")?;
+        assert!(matches!(resolved, ResolvedOobi::Url(url) if url.oobi == "http://h/oobi/E"));
+        assert_eq!(resolved.key_state(), None);
+        assert_eq!(serde_json::to_string(&operation)?, answer);
+        Ok(())
+    }
+
+    #[test]
+    fn an_oobi_operation_with_a_known_controller_returns_its_key_state() -> Result<(), Box<dyn Error>> {
+        let answer = format!(
+            r#"{{"name":"oobi.E","metadata":{{"oobi":"http://h/oobi/E"}},"response":{KEY_STATE},"done":true}}"#
+        );
+        let operation: OobiOperation = serde_json::from_str(&answer)?;
+        let resolved = operation
+            .outcome
+            .response()
+            .ok_or("the operation carried no response")?;
+        assert!(matches!(resolved, ResolvedOobi::KeyState(_)));
+        assert_eq!(resolved.key_state().map(|state| state.identifier.as_str()), Some("EAB"));
+        assert!(resolved.clone().into_key_state().is_some());
+        assert_eq!(serde_json::to_string(&operation)?, answer);
+
+        // A response matching neither shape is refused rather than guessed at.
+        assert!(serde_json::from_str::<ResolvedOobi>(r#"{"$id":"ESCH"}"#).is_err());
         Ok(())
     }
 

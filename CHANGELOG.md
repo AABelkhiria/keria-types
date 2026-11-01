@@ -15,6 +15,7 @@
 - `api::RevocationEvent`, a revocation of either shape, with `kind`, `digest`, `credential` and `registry`.
 - `api::BackedRevocationRecord`, a revocation in a registry with backers.
 - `api::BackedRevocationIlk` and `api::REVOCATION_ILKS`, the `t` values of a revocation event.
+- `api::ResolvedOobi`, the result of an OOBI operation, with `key_state` and `into_key_state`.
 
 ### Fixed
 
@@ -29,6 +30,8 @@
   backers failed to decode with ``missing field `ri` ``. The schema's `bis` with `ri` is now refused.
 - `MultisigRevocationEmbed.rev` is now `RevocationEvent`, not `RevocationRecord`, which accepted only `rev`, so a
   revocation proposal for a registry with backers failed to decode.
+- `OobiOperation` now completes with `ResolvedOobi`, not `KeyState`. KERIA answers `{oobi}` when it knows no controller
+  for the OOBI, so resolving an OOBI for a credential schema failed to decode with ``missing field `i` ``.
 - `DelegatorMetadata.anchor` is now `Option<KeyEvent>`, not `Option<Anchor>`. KERIA echoes the approving
   event there, usually an `ixn`, so a real delegator operation failed to decode with ``missing field `pre` ``.
 

@@ -127,7 +127,7 @@ pub use operation::{
     ExchangeOperation, GroupMetadata, GroupOperation, KelMetadata, KelOperation, KelResponse, LocationSchemeMetadata,
     LocationSchemeOperation, LogPositionMetadata, OobiMetadata, OobiOperation, Operation, OperationOutcome,
     OperationStatus, QueryMetadata, QueryOperation, RegistryMetadata, RegistryOperation, RegistryResponse,
-    SubmitMetadata, SubmitOperation, UntypedOperation, WitnessMetadata, WitnessOperation,
+    ResolvedOobi, SubmitMetadata, SubmitOperation, UntypedOperation, WitnessMetadata, WitnessOperation,
 };
 
 /// Largest JSON document [`from_json_slice`] will decode, in bytes.
