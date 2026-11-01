@@ -16,6 +16,7 @@
 - `api::BackedRevocationRecord`, a revocation in a registry with backers.
 - `api::BackedRevocationIlk` and `api::REVOCATION_ILKS`, the `t` values of a revocation event.
 - `api::ResolvedOobi`, the result of an OOBI operation, with `key_state` and `into_key_state`.
+- `api::ThresholdWeight` and `api::NestedWeight`, the entries of a weighted threshold clause.
 
 ### Fixed
 
@@ -35,6 +36,8 @@
 - `SubmitMetadata` is now a struct of `alias` and `sn`, not an alias of `LogPositionMetadata`. KERIA writes `alias` in
   place of `pre`, so a real submit operation failed to decode with ``missing field `pre` ``. The schema's `{pre, sn}` is
   now refused.
+- `Threshold::Clause` and `Threshold::Clauses` now hold `ThresholdWeight`, not `String`. keripy writes nested weights
+  such as `[{"1/2":["1/2","1/2"]},"1/2"]`, so any key event or key state with such a threshold failed to decode.
 - `DelegatorMetadata.anchor` is now `Option<KeyEvent>`, not `Option<Anchor>`. KERIA echoes the approving
   event there, usually an `ixn`, so a real delegator operation failed to decode with ``missing field `pre` ``.
 

@@ -117,8 +117,9 @@ pub use message::{
     AcdcAttributes, AcdcRecord, Anchor, BackedIssuanceIlk, BackedRevocationIlk, BackedRevocationRecord,
     DelegatedInceptionIlk, DelegatedInceptionRecord, DelegatedRotationIlk, EventSeal, ExchangeIlk, ExchangeRecord,
     InceptionIlk, InceptionRecord, InteractionIlk, InteractionRecord, IssuanceIlk, KEY_EVENT_ILKS, KeyEvent,
-    KeyEventRecord, REVOCATION_ILKS, RegistryInceptionIlk, RegistryInceptionRecord, ReplyIlk, ReplyRecord,
-    RevocationEvent, RevocationIlk, RevocationRecord, RotationIlk, RotationRecord, Schema, Seal, Threshold,
+    KeyEventRecord, NestedWeight, REVOCATION_ILKS, RegistryInceptionIlk, RegistryInceptionRecord, ReplyIlk,
+    ReplyRecord, RevocationEvent, RevocationIlk, RevocationRecord, RotationIlk, RotationRecord, Schema, Seal,
+    Threshold, ThresholdWeight,
 };
 pub use operation::{
     ChallengeMetadata, ChallengeOperation, ChallengeResponse, CredentialMetadata, CredentialOperation,

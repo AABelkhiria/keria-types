@@ -76,6 +76,10 @@ Two systemic effects fall out of that and explain most of the divergence table:
 
 ## Documents recorded as safe Rust divergences
 
+- **A threshold wider than declared.** The event schemas declare `kt` and `nt` as a string or lists of
+  strings, and `KeyStateRecord` as a string or one list. keripy also writes nested weights, and a key
+  state carries whatever its event did, so `Threshold` covers all of these. No document here has a
+  list threshold; the tests in `src/api/message.rs` cover them.
 - **An OOBI operation answering `{oobi}`, or submit metadata with `alias`.** The schema declares a key
   state as the only response of an OOBI operation, and `{pre, sn}` as a submit operation's metadata.
   KERIA also answers `{oobi}` to the first and writes `{alias, sn}` for the second, so Rust accepts

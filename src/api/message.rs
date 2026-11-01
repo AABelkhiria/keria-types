@@ -21,6 +21,7 @@
 //! `signify-keri::serialization`.
 
 use core::fmt;
+use std::collections::BTreeMap;
 
 use serde::de::{self, Unexpected, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -100,20 +101,61 @@ ilk_marker!(BackedIssuanceIlk, "bis", "TEL backed credential issuance, ilk `bis`
 
 /// A signing, rotation, or witness threshold as a KERI message spells it.
 ///
-/// The schema writes a threshold three ways: a single value such as `"1"` or `"1/2"`, one clause of
-/// weights, or several clauses. A key state declares only the first two forms and a key event all
-/// three; this one type covers both positions, which is a deliberate widening of the key-state
-/// field. Weights stay as written — reducing a rational and deciding
-/// whether a threshold is satisfied is `signify-keri::threshold`, which owns exact arithmetic.
+/// A threshold is a single value such as `"1"` or `"1/2"`, one clause of weights, or several
+/// clauses. This one type covers key events and key states, whose schema declares fewer forms.
+/// Weights stay as written: reducing a rational and deciding whether a threshold is satisfied is
+/// `keri_protocol::threshold`, which does not yet read nested weights.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum Threshold {
     /// One value, such as `"1"` or `"1/2"`.
     Simple(String),
     /// One clause of weights, such as `["1/2", "1/2", "1/2"]`.
-    Clause(Vec<String>),
+    Clause(Vec<ThresholdWeight>),
     /// Several weighted clauses, all of which must be satisfied.
-    Clauses(Vec<Vec<String>>),
+    Clauses(Vec<Vec<ThresholdWeight>>),
+}
+
+/// One entry of a weighted threshold clause.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(untagged)]
+pub enum ThresholdWeight {
+    /// A plain weight, such as `"1/2"`.
+    Simple(String),
+    /// A group of keys with a weight of its own.
+    Nested(NestedWeight),
+}
+
+/// A group of keys that adds its weight to a clause only when its own weights sum to 1.
+///
+/// `[{"1/2": ["1/2", "1/2", "1/2"]}, "1/2"]` covers four keys and requires any two of the first
+/// three plus the fourth. keripy writes these, although KERIA's schema declares only strings.
+///
+/// The wire form is an object with exactly one key, the group's weight.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NestedWeight {
+    /// The weight the group adds to its clause.
+    pub weight: String,
+    /// The weights of the keys in the group.
+    pub members: Vec<String>,
+}
+
+impl Serialize for NestedWeight {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.collect_map([(&self.weight, &self.members)])
+    }
+}
+
+impl<'de> Deserialize<'de> for NestedWeight {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let entries = BTreeMap::<String, Vec<String>>::deserialize(deserializer)?;
+        let count = entries.len();
+        let mut entries = entries.into_iter();
+        match (entries.next(), entries.next()) {
+            (Some((weight, members)), None) => Ok(Self { weight, members }),
+            _ => Err(de::Error::invalid_length(count, &"exactly one weight")),
+        }
+    }
 }
 
 /// A seal anchored in a key event, naming an event in another log.
@@ -1039,14 +1081,21 @@ mod tests {
         Ok(())
     }
 
+    fn half() -> ThresholdWeight {
+        ThresholdWeight::Simple("1/2".to_owned())
+    }
+
     #[test]
     fn a_threshold_keeps_the_shape_it_arrived_in() -> Result<(), Box<dyn Error>> {
         for (document, expected) in [
             (r#""1""#, Threshold::Simple("1".to_owned())),
-            (r#"["1/2","1/2"]"#, Threshold::Clause(vec!["1/2".into(), "1/2".into()])),
+            (r#"["1/2","1/2"]"#, Threshold::Clause(vec![half(), half()])),
             (
                 r#"[["1/2","1/2"],["1"]]"#,
-                Threshold::Clauses(vec![vec!["1/2".into(), "1/2".into()], vec!["1".into()]]),
+                Threshold::Clauses(vec![
+                    vec![half(), half()],
+                    vec![ThresholdWeight::Simple("1".to_owned())],
+                ]),
             ),
         ] {
             let threshold: Threshold = serde_json::from_str(document)?;
@@ -1099,6 +1148,50 @@ mod tests {
         assert!(serde_json::from_str::<RevocationEvent>(&relabelled).is_err());
         let relabelled = BACKED_REVOCATION.replace(r#""t":"brv""#, r#""t":"rev""#);
         assert!(serde_json::from_str::<RevocationEvent>(&relabelled).is_err());
+    }
+
+    #[test]
+    fn a_threshold_keeps_a_nested_weight() -> Result<(), Box<dyn Error>> {
+        let clause = r#"[{"1/2":["1/2","1/2"]},"1/2"]"#;
+        let threshold: Threshold = serde_json::from_str(clause)?;
+        let nested = NestedWeight {
+            weight: "1/2".to_owned(),
+            members: vec!["1/2".to_owned(), "1/2".to_owned()],
+        };
+        assert_eq!(
+            threshold,
+            Threshold::Clause(vec![ThresholdWeight::Nested(nested), half()])
+        );
+        assert_eq!(serde_json::to_string(&threshold)?, clause);
+
+        let clauses = r#"[["1/2","1/2"],[{"1/3":["1/2","1/2"]},"2/3"]]"#;
+        let threshold: Threshold = serde_json::from_str(clauses)?;
+        assert!(matches!(threshold, Threshold::Clauses(_)));
+        assert_eq!(serde_json::to_string(&threshold)?, clauses);
+
+        let rotation = ROTATION_AT_ZERO.replace(r#""kt":"2""#, &format!(r#""kt":{clause}"#));
+        let event: KeyEvent = serde_json::from_str(&rotation)?;
+        assert_eq!(serde_json::to_string(&event)?, rotation);
+        Ok(())
+    }
+
+    #[test]
+    fn a_malformed_threshold_weight_is_refused() {
+        for wrong in [
+            r#"[{"1/2":"1/2"}]"#,
+            r#"[{"1/2":[1]}]"#,
+            "[[1]]",
+            "[{}]",
+            "[[{}]]",
+            r#"[{"1/2":["1"],"1/3":["1"]}]"#,
+            r#"[{"1/2":[{"1/2":["1"]}]}]"#,
+            r#"{"1/2":["1"]}"#,
+        ] {
+            assert!(
+                serde_json::from_str::<Threshold>(wrong).is_err(),
+                "{wrong} was accepted"
+            );
+        }
     }
 
     #[test]

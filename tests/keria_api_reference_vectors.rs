@@ -634,6 +634,18 @@ fn the_schema_still_declares_what_keria_does_not_send() -> Result<(), Box<dyn Er
     };
     assert_eq!(field_names("SubmitOperationMetadata"), ["pre", "sn"]);
 
+    let threshold_arms = |schema: &str| -> usize {
+        fixture
+            .pointer(&format!("/schemas/{schema}/fields"))
+            .and_then(Value::as_array)
+            .and_then(|fields| fields.iter().find(|field| field.get("name") == Some(&"kt".into())))
+            .and_then(|field| field.pointer("/type/members"))
+            .and_then(Value::as_array)
+            .map_or(0, Vec::len)
+    };
+    assert_eq!(threshold_arms("ICP_V_1"), 3);
+    assert_eq!(threshold_arms("KeyStateRecord"), 2);
+
     let response = fixture
         .pointer("/schemas/CompletedOOBIOperation/fields")
         .and_then(Value::as_array)
