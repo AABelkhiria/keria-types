@@ -8362,7 +8362,8 @@
       "literal_accepted": false,
       "structural_accepted": false,
       "rust_type": "CredentialState",
-      "rust_expected": "accept",
+      "rust_expected": "reject",
+      "note": "`a.s` is a string, as the schema declares; KERIA sends a number",
       "literal_diagnostics": [
         "Type '\"iss\"' is not assignable to type 'CredentialStateIssOrRevEt | CredentialStateBisOrBrvEt'."
       ],
@@ -8397,7 +8398,8 @@
       "literal_accepted": false,
       "structural_accepted": false,
       "rust_type": "CredentialState",
-      "rust_expected": "accept",
+      "rust_expected": "reject",
+      "note": "`a.s` is a string, as the schema declares; KERIA sends a number",
       "literal_diagnostics": [
         "Type '\"brv\"' is not assignable to type 'CredentialStateIssOrRevEt | CredentialStateBisOrBrvEt'."
       ],
@@ -8433,7 +8435,7 @@
       "structural_accepted": false,
       "rust_type": "CredentialState",
       "rust_expected": "reject",
-      "note": "`ra` is `Record<string, never>` on the unbacked arm",
+      "note": "`ra` is `Record<string, never>` on the unbacked arm; refused for `a.s` first, so the tests set `a.s` to a number",
       "literal_diagnostics": [
         "Type '\"iss\"' is not assignable to type 'CredentialStateIssOrRevEt | CredentialStateBisOrBrvEt'."
       ],
@@ -8554,7 +8556,8 @@
       "literal_accepted": false,
       "structural_accepted": false,
       "rust_type": "Credential",
-      "rust_expected": "accept",
+      "rust_expected": "reject",
+      "note": "`a.s` is a string, as the schema declares; KERIA sends a number",
       "literal_diagnostics": [
         "Type '\"iss\"' is not assignable to type 'IssEventT'.",
         "Type '\"iss\"' is not assignable to type 'CredentialStateIssOrRevEt | CredentialStateBisOrBrvEt'."
@@ -9993,21 +9996,6 @@
     },
     {
       "name": "issuance_event",
-      "reference_accepts": false,
-      "rust_accepts": true
-    },
-    {
-      "name": "credential_status_unbacked",
-      "reference_accepts": false,
-      "rust_accepts": true
-    },
-    {
-      "name": "credential_status_backed",
-      "reference_accepts": false,
-      "rust_accepts": true
-    },
-    {
-      "name": "credential",
       "reference_accepts": false,
       "rust_accepts": true
     },

@@ -8,12 +8,16 @@
 ### Added
 
 - `api::EventSeal`, a seal that requires `i`, `s` and `d` and writes them in that order.
+- `api::StatusAnchor`, the anchor of a credential status, whose `s` is a number.
 
 ### Fixed
 
 - `RegistryMetadata.anchor` and `RegistryResponse.anchor` are now `EventSeal`, not `Anchor`. KERIA sends
   the registry's `{i, s, d}` seal there, so a real registry operation failed to decode with ``missing field `pre` ``.
   The schema's `{pre, sn, d}` is now refused, and `RegistryMetadata` writes `anchor` before `depends`, as KERIA does.
+- `UnbackedCredentialState.anchor` and `BackedCredentialState.anchor` are now `StatusAnchor`, not `Seal`. KERIA sends
+  `s` as a number there, so a real credential or credential status failed to decode with ``invalid type: integer``.
+  The schema's string `s` is now refused.
 - `DelegatorMetadata.anchor` is now `Option<KeyEvent>`, not `Option<Anchor>`. KERIA echoes the approving
   event there, usually an `ixn`, so a real delegator operation failed to decode with ``missing field `pre` ``.
 

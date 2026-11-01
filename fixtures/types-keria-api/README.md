@@ -68,13 +68,18 @@ Two systemic effects fall out of that and explain most of the divergence table:
   assignable to `Tier`, and `"agent"` is not assignable to `OOBIRole`. That makes `IssEvent`,
   `SaltyState` (and so every salty `HabState`), `RegistryState`, `CredentialState`, `Credential`,
   `Registry`, and `OOBI` unsatisfiable by any response — the very types upstream casts responses to.
-  Rust accepts these documents; the divergence is against a compile-time artifact the reference's
+  Rust accepts these documents, except the credential ones below; the divergence is against a compile-time artifact the reference's
   own run time ignores.
 - **A literal type widens through a variable.** `done: false` inferred from an object becomes
   `boolean`, which no operation arm accepts, so `operation_pending` is `literal_accepted` but not
   `structural_accepted`. The `Operation` union is usable only for a directly written literal.
 
 ## Documents recorded as safe Rust divergences
+
+- **A status sequence number as a string.** `credential` and the four `credential_status_*` documents
+  carry `a.s` as a string, as the schema declares. KERIA sends a number, so Rust refuses them. The
+  reference refuses them too, for the enum above, so they are not in `divergences`. The tests set
+  `a.s` to a number before checking field order, required fields and the `ra` refusal.
 
 - **An unknown field.** `key_state_unknown_field` is refused by the excess-property check and
   accepted structurally and at run time. Rust accepts and ignores it, so a newer agent adding a

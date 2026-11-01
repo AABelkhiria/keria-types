@@ -4,7 +4,7 @@ use serde::de;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::{Map, Value};
 
-use super::message::{AcdcRecord, Anchor, KeyEvent, Schema, Seal};
+use super::message::{AcdcRecord, Anchor, KeyEvent, Schema};
 
 /// An object the schema declares as having no properties at all.
 ///
@@ -92,6 +92,19 @@ pub struct RevocationAnchor {
     pub digest: String,
 }
 
+/// Where a TEL event is anchored in the issuer's key event log.
+///
+/// KERIA writes `s` as a JSON number here, although its schema declares a string.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct StatusAnchor {
+    /// Sequence number of the anchoring event, wire label `s`.
+    #[serde(rename = "s")]
+    pub sequence_number: u64,
+    /// Digest of the anchoring event, wire label `d`.
+    #[serde(rename = "d")]
+    pub digest: String,
+}
+
 /// The status of a credential whose registry has no backers.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct UnbackedCredentialState {
@@ -112,7 +125,7 @@ pub struct UnbackedCredentialState {
     pub registry: String,
     /// The seal anchoring the TEL event in the issuer's key event log, wire label `a`.
     #[serde(rename = "a")]
-    pub anchor: Seal,
+    pub anchor: StatusAnchor,
     /// Timestamp, wire label `dt`.
     #[serde(rename = "dt")]
     pub stamp: String,
@@ -144,7 +157,7 @@ pub struct BackedCredentialState {
     pub registry: String,
     /// The seal anchoring the TEL event in the issuer's key event log, wire label `a`.
     #[serde(rename = "a")]
-    pub anchor: Seal,
+    pub anchor: StatusAnchor,
     /// Timestamp, wire label `dt`.
     #[serde(rename = "dt")]
     pub stamp: String,
@@ -324,8 +337,8 @@ mod tests {
     use super::*;
     use std::error::Error;
 
-    const UNBACKED: &str = r#"{"vn":[1,0],"i":"ECRED","s":"0","d":"EAB","ri":"EREG","a":{"s":"1","d":"EANC"},"dt":"2023-08-19T21:04:57.948863+00:00","et":"iss","ra":{}}"#;
-    const BACKED: &str = r#"{"vn":[1,0],"i":"ECRED","s":"1","d":"EAB","ri":"EREG","a":{"s":"2","d":"EANC"},"dt":"2023-08-19T21:04:57.948863+00:00","et":"brv","ra":{"i":"EREG","s":"1","d":"EREGEV"}}"#;
+    const UNBACKED: &str = r#"{"vn":[1,0],"i":"ECRED","s":"0","d":"EAB","ri":"EREG","a":{"s":1,"d":"EANC"},"dt":"2023-08-19T21:04:57.948863+00:00","et":"iss","ra":{}}"#;
+    const BACKED: &str = r#"{"vn":[1,0],"i":"ECRED","s":"1","d":"EAB","ri":"EREG","a":{"s":2,"d":"EANC"},"dt":"2023-08-19T21:04:57.948863+00:00","et":"brv","ra":{"i":"EREG","s":"1","d":"EREGEV"}}"#;
 
     #[test]
     fn the_status_field_chooses_the_registry_shape() -> Result<(), Box<dyn Error>> {
@@ -354,6 +367,23 @@ mod tests {
             );
         }
         assert!(serde_json::from_str::<CredentialState>(r#"{"vn":[1,0]}"#).is_err());
+    }
+
+    #[test]
+    fn a_status_anchor_counts_in_a_json_number() -> Result<(), Box<dyn Error>> {
+        let wire = r#"{"s":1,"d":"EANC"}"#;
+        let anchor: StatusAnchor = serde_json::from_str(wire)?;
+        assert_eq!(anchor.sequence_number, 1);
+        assert_eq!(anchor.digest, "EANC");
+        assert_eq!(serde_json::to_string(&anchor)?, wire);
+
+        for wrong in [r#"{"s":"1","d":"EANC"}"#, r#"{"d":"EANC"}"#, r#"{"s":1}"#] {
+            assert!(
+                serde_json::from_str::<StatusAnchor>(wrong).is_err(),
+                "{wrong} was accepted"
+            );
+        }
+        Ok(())
     }
 
     #[test]

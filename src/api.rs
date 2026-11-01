@@ -15,6 +15,18 @@
 //! extracted from it by the TypeScript compiler, so a drift becomes a failing test rather than a
 //! silent incompatibility.
 //!
+//! # Seals and anchors
+//!
+//! KERIA names an anchored event in several shapes, and the schema does not always say which:
+//!
+//! | Type | Wire shape | Where |
+//! |---|---|---|
+//! | [`Seal`] | `{s, d, i?}`, `s` a string | a key state query's anchor |
+//! | [`EventSeal`] | `{i, s, d}`, `s` a string | a registry's anchor |
+//! | [`RevocationAnchor`] | `{i, s, d}`, `s` a string | a backed credential status's `ra` |
+//! | [`Anchor`] | `{pre, sn, d}`, `sn` a number | a credential's `anchor` |
+//! | [`StatusAnchor`] | `{s, d}`, `s` a number | a credential status's `a` |
+//!
 //! # Decoding
 //!
 //! [`from_json_slice`] is the bounded entry point: it refuses a document above
@@ -88,8 +100,8 @@ pub use contact::{
 };
 pub use credential::{
     BackedCredentialState, BackedCredentialStatus, CREDENTIAL_STATUS_KINDS, Credential, CredentialState, EmptyObject,
-    IssuanceEvent, IssuanceKind, Registry, RegistryEventKind, RegistryState, RevocationAnchor, UnbackedCredentialState,
-    UnbackedCredentialStatus,
+    IssuanceEvent, IssuanceKind, Registry, RegistryEventKind, RegistryState, RevocationAnchor, StatusAnchor,
+    UnbackedCredentialState, UnbackedCredentialStatus,
 };
 pub use error::ApiError;
 pub use exchange::{
