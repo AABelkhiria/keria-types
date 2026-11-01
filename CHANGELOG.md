@@ -3,6 +3,18 @@
 > Following [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 > and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `api::EventSeal`, a seal that requires `i`, `s` and `d` and writes them in that order.
+
+### Fixed
+
+- `RegistryMetadata.anchor` and `RegistryResponse.anchor` are now `EventSeal`, not `Anchor`. KERIA sends
+  the registry's `{i, s, d}` seal there, so a real registry operation failed to decode with ``missing field `pre` ``.
+  The schema's `{pre, sn, d}` is now refused, and `RegistryMetadata` writes `anchor` before `depends`, as KERIA does.
+
 ## [0.1.0] - 2026-10-06
 
 First release, extracted from the signify-rs project with its history.

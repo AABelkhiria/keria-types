@@ -40,8 +40,9 @@ schema by the pinned compiler, twice:
   excess-property check but widens literal types.
 
 Each document also records `rust_type` and `rust_expected`: what this port decodes it as and whether
-decoding succeeds. `divergences` lists, computed rather than transcribed, every document the two
-decide differently.
+decoding succeeds. `divergences` lists every document the two decide differently. The generator computed
+both; since it was not carried over, changes to them are made by hand, and the reference columns stay
+as generated.
 
 ## Provenance of the OpenAPI document
 
@@ -89,6 +90,9 @@ Two systemic effects fall out of that and explain most of the divergence table:
   `ApiError::AmbiguousKeyManagerState`.
 - **A fractional sequence number.** `anchor_fractional_sequence_number` carries `sn: 1.5`, which the
   schema's `number` admits; Rust decodes an anchor's sequence number as an unsigned integer.
+- **A registry anchor in the schema's shape.** `operation_registry_with_dependency` carries `anchor`
+  as `{pre, sn, d}`, as the schema declares. KERIA sends the registry's seal, `{i, s, d}`, and Rust
+  decodes that.
 - **A role outside the nine declared.** `oobi_unknown_role` is refused by the reference's `OOBIRole`
   enum while `end_role_unknown_role`, the same text in the field the schema types as a bare string,
   is accepted — the schema is inconsistent about this. Rust reads both, keeping an unnamed role as

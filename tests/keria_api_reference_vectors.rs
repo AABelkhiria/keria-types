@@ -9,7 +9,7 @@
 //!   from under this port fails a test rather than producing a silent incompatibility.
 //! - The **verdicts** the pinned compiler returns for 82 documents. Each is decoded here with the
 //!   Rust type the fixture names, and the result compared with what the fixture records — including
-//!   the thirteen documents the two implementations deliberately decide differently.
+//!   the fifteen documents the two implementations deliberately decide differently.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
@@ -36,7 +36,7 @@ const FIXTURE: &str = include_str!("../fixtures/types-keria-api/v1.json");
 ///
 /// Each is explained in `fixtures/types-keria-api/README.md`. The list is
 /// asserted exactly, so a new disagreement cannot appear unnoticed.
-const EXPECTED_DIVERGENCES: [(&str, bool, bool); 14] = [
+const EXPECTED_DIVERGENCES: [(&str, bool, bool); 15] = [
     ("key_state_unknown_field", false, true),
     ("agent_resource_result_upstream_mock", false, true),
     ("key_event_receipt_ilk", true, false),
@@ -47,6 +47,7 @@ const EXPECTED_DIVERGENCES: [(&str, bool, bool); 14] = [
     ("registry", false, true),
     ("hab_salty", false, true),
     ("hab_two_key_managers", true, false),
+    ("operation_registry_with_dependency", true, false),
     ("member_ends_missing_a_role", false, true),
     ("oobi", false, true),
     ("oobi_unknown_role", false, true),

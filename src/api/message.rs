@@ -123,6 +123,20 @@ pub struct Seal {
     pub identifier: Option<String>,
 }
 
+/// A seal naming an event in another log, with every field required and written in KERI's `{i, s, d}` order.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct EventSeal {
+    /// Identifier prefix of the sealed log, wire label `i`.
+    #[serde(rename = "i")]
+    pub identifier: String,
+    /// Sequence number of the sealed event, wire label `s`.
+    #[serde(rename = "s")]
+    pub sequence_number: String,
+    /// Digest of the sealed event, wire label `d`.
+    #[serde(rename = "d")]
+    pub digest: String,
+}
+
 /// The event a long-running KERIA operation is waiting to see anchored.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct Anchor {
@@ -935,6 +949,21 @@ mod tests {
         let full: Seal = serde_json::from_str(r#"{"s":"0","d":"EAB","i":"ECD"}"#)?;
         assert_eq!(full.identifier.as_deref(), Some("ECD"));
         assert_eq!(serde_json::to_string(&full)?, r#"{"s":"0","d":"EAB","i":"ECD"}"#);
+        Ok(())
+    }
+
+    #[test]
+    fn an_event_seal_requires_every_field_and_keeps_keris_order() -> Result<(), Box<dyn Error>> {
+        let wire = r#"{"i":"ECD","s":"0","d":"EAB"}"#;
+        let seal: EventSeal = serde_json::from_str(wire)?;
+        assert_eq!(seal.sequence_number, "0");
+        assert_eq!(serde_json::to_string(&seal)?, wire);
+        for wrong in [r#"{"s":"0","d":"EAB"}"#, r#"{"i":"ECD","s":0,"d":"EAB"}"#] {
+            assert!(
+                serde_json::from_str::<EventSeal>(wrong).is_err(),
+                "{wrong} was accepted"
+            );
+        }
         Ok(())
     }
 

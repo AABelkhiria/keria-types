@@ -30,7 +30,7 @@ use serde_json::{Map, Value};
 
 use super::error::ApiError;
 use super::key_state::KeyState;
-use super::message::{AcdcRecord, Anchor, ExchangeRecord, KeyEvent, ReplyRecord, Seal};
+use super::message::{AcdcRecord, Anchor, EventSeal, ExchangeRecord, KeyEvent, ReplyRecord, Seal};
 
 /// Why a KERIA operation failed.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -371,17 +371,17 @@ pub struct EndRoleMetadata {
 pub struct RegistryMetadata {
     /// Identifier prefix that owns the registry.
     pub pre: String,
+    /// Seal of the registry inception, waiting to be anchored in the owner's log.
+    pub anchor: EventSeal,
     /// The key-event operation this one is waiting on.
     pub depends: Box<KelOperation>,
-    /// Event the registry inception is waiting to see anchored.
-    pub anchor: Anchor,
 }
 
 /// The result of a completed registry operation.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct RegistryResponse {
-    /// The anchoring event.
-    pub anchor: Anchor,
+    /// Seal of the anchored registry inception.
+    pub anchor: EventSeal,
 }
 
 /// Metadata of an operation publishing a location scheme.
@@ -665,13 +665,44 @@ mod tests {
     fn a_dependent_operation_nests_its_dependency() -> Result<(), Box<dyn Error>> {
         let depends = r#"{"name":"witness.EABC","metadata":{"pre":"EABC","sn":0},"done":false}"#;
         let document = format!(
-            r#"{{"name":"registry.EREG","metadata":{{"pre":"EABC","depends":{depends},"anchor":{{"pre":"EABC","sn":1,"d":"EAB"}}}},"done":false}}"#
+            r#"{{"name":"registry.EREG","metadata":{{"pre":"EABC","anchor":{{"i":"EREG","s":"0","d":"EREG"}},"depends":{depends}}},"done":false}}"#
         );
         let operation: RegistryOperation = serde_json::from_str(&document)?;
         let metadata = operation.metadata.as_ref().ok_or("registry metadata was dropped")?;
-        assert_eq!(metadata.anchor.sn, 1);
+        assert_eq!(metadata.anchor.sequence_number, "0");
         assert!(matches!(metadata.depends.metadata, Some(KelMetadata::Log(_))));
         assert_eq!(serde_json::to_string(&operation)?, document);
+        Ok(())
+    }
+
+    #[test]
+    fn a_registry_operation_carries_the_seal_of_the_registry() -> Result<(), Box<dyn Error>> {
+        // KERIA seals the registry to itself: `i` and `d` are both its prefix, not the owner's.
+        let seal = r#"{"i":"EREG","s":"0","d":"EREG"}"#;
+        let metadata = format!(
+            r#"{{"pre":"EABC","anchor":{seal},"depends":{{"name":"witness.EIXN","metadata":{{"pre":"EABC","sn":1}},"done":false,"error":null,"response":null}}}}"#
+        );
+        let decoded: RegistryMetadata = serde_json::from_str(&metadata)?;
+        assert_eq!(decoded.anchor.identifier, "EREG");
+        assert_eq!(decoded.anchor.sequence_number, "0");
+        assert_eq!(decoded.anchor.digest, "EREG");
+
+        let response = format!(r#"{{"anchor":{seal}}}"#);
+        let decoded: RegistryResponse = serde_json::from_str(&response)?;
+        assert_eq!(decoded.anchor.identifier, "EREG");
+        assert_eq!(serde_json::to_string(&decoded)?, response);
+
+        let completed = format!(
+            r#"{{"name":"registry.EREG","metadata":{metadata},"done":true,"error":null,"response":{response}}}"#
+        );
+        let operation: RegistryOperation = serde_json::from_str(&completed)?;
+        assert_eq!(
+            operation.outcome.response().map(|done| done.anchor.digest.as_str()),
+            Some("EREG")
+        );
+
+        // The schema's `{pre, sn, d}` is never sent here.
+        assert!(serde_json::from_str::<RegistryResponse>(r#"{"anchor":{"pre":"EABC","sn":1,"d":"EAB"}}"#).is_err());
         Ok(())
     }
 

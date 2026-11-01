@@ -104,9 +104,9 @@ pub use identifier::{
 pub use key_state::{AgentResourceResult, Controller, EstablishmentState, KeyState};
 pub use message::{
     AcdcAttributes, AcdcRecord, Anchor, DelegatedInceptionIlk, DelegatedInceptionRecord, DelegatedRotationIlk,
-    ExchangeIlk, ExchangeRecord, InceptionIlk, InceptionRecord, InteractionIlk, InteractionRecord, KEY_EVENT_ILKS,
-    KeyEvent, KeyEventRecord, RegistryInceptionIlk, RegistryInceptionRecord, ReplyIlk, ReplyRecord, RevocationIlk,
-    RevocationRecord, RotationIlk, RotationRecord, Schema, Seal, Threshold,
+    EventSeal, ExchangeIlk, ExchangeRecord, InceptionIlk, InceptionRecord, InteractionIlk, InteractionRecord,
+    KEY_EVENT_ILKS, KeyEvent, KeyEventRecord, RegistryInceptionIlk, RegistryInceptionRecord, ReplyIlk, ReplyRecord,
+    RevocationIlk, RevocationRecord, RotationIlk, RotationRecord, Schema, Seal, Threshold,
 };
 pub use operation::{
     ChallengeMetadata, ChallengeOperation, ChallengeResponse, CredentialMetadata, CredentialOperation,
