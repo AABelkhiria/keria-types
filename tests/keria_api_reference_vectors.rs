@@ -21,7 +21,7 @@ use keria_types::api::{
     ExchangeRecord, ExchangeResource, GroupMember, Hab, IssuanceEvent, KeyEvent, KeyEventRecord, KeyState, KeyTier,
     MemberEnds, MultisigExchangeResource, MultisigInceptionEmbed, MultisigReplyEmbed, Notification, Oobi,
     OperationStatus, PendingHab, RegistryInceptionRecord, RegistryOperation, RegistryState, ReplyRecord,
-    RevocationRecord, Role, SaltyState, Schema, Seal, UntypedOperation, WellKnown, WitnessOperation, from_json_slice,
+    RevocationEvent, Role, SaltyState, Schema, Seal, UntypedOperation, WellKnown, WitnessOperation, from_json_slice,
     message,
 };
 use keria_types::api::{Registry, to_json_string};
@@ -325,7 +325,7 @@ fn decode_named(rust_type: &str, json: &Value) -> Result<Result<Vec<String>, Str
         "RegistryOperation" => RegistryOperation,
         "RegistryState" => RegistryState,
         "ReplyRecord" => ReplyRecord,
-        "RevocationRecord" => RevocationRecord,
+        "RevocationEvent" => RevocationEvent,
         "SaltyState" => SaltyState,
         "Schema" => Schema,
         "Seal" => Seal,
@@ -522,6 +522,12 @@ fn every_closed_code_table_matches_the_reference_enum() -> Result<(), Box<dyn Er
     );
 
     assert_eq!(values("IssEventT"), keria_types::api::ISSUANCE_ILKS);
+    // The schema has no revocation table of its own; each status table ends in its revocation.
+    let revocations: Vec<String> = ["CredentialStateIssOrRevEt", "CredentialStateBisOrBrvEt"]
+        .into_iter()
+        .filter_map(|table| values(table).pop())
+        .collect();
+    assert_eq!(revocations, keria_types::api::REVOCATION_ILKS);
 
     // Every declared value must decode into its Rust counterpart, and nothing else may.
     for value in values("Tier") {

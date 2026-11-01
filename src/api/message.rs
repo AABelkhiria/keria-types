@@ -90,6 +90,11 @@ ilk_marker!(ReplyIlk, "rpy", "Reply, ilk `rpy`.");
 ilk_marker!(ExchangeIlk, "exn", "Exchange, ilk `exn`.");
 ilk_marker!(RegistryInceptionIlk, "vcp", "TEL registry inception, ilk `vcp`.");
 ilk_marker!(RevocationIlk, "rev", "TEL credential revocation, ilk `rev`.");
+ilk_marker!(
+    BackedRevocationIlk,
+    "brv",
+    "TEL backed credential revocation, ilk `brv`."
+);
 ilk_marker!(IssuanceIlk, "iss", "TEL credential issuance, ilk `iss`.");
 ilk_marker!(BackedIssuanceIlk, "bis", "TEL backed credential issuance, ilk `bis`.");
 
@@ -558,7 +563,7 @@ pub struct RegistryInceptionRecord {
     pub nonce: String,
 }
 
-/// A TEL credential revocation event as KERIA returns it, ilk `rev`.
+/// A TEL credential revocation event in a registry with no backers, ilk `rev`.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct RevocationRecord {
     /// Version string, wire label `v`.
@@ -585,6 +590,117 @@ pub struct RevocationRecord {
     /// Timestamp, wire label `dt`.
     #[serde(rename = "dt")]
     pub stamp: String,
+}
+
+/// A TEL credential revocation event in a registry with backers, ilk `brv`.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct BackedRevocationRecord {
+    /// Version string, wire label `v`.
+    #[serde(rename = "v")]
+    pub version: String,
+    /// Event kind, wire label `t`.
+    #[serde(rename = "t")]
+    pub kind: BackedRevocationIlk,
+    /// Event SAID, wire label `d`.
+    #[serde(rename = "d")]
+    pub digest: String,
+    /// Credential SAID, wire label `i`.
+    #[serde(rename = "i")]
+    pub credential: String,
+    /// Sequence number, wire label `s`.
+    #[serde(rename = "s")]
+    pub sequence_number: String,
+    /// Prior TEL event digest, wire label `p`.
+    #[serde(rename = "p")]
+    pub prior: String,
+    /// Where the registry stood at revocation, wire label `ra`.
+    #[serde(rename = "ra")]
+    pub registry_anchor: EventSeal,
+    /// Timestamp, wire label `dt`.
+    #[serde(rename = "dt")]
+    pub stamp: String,
+}
+
+/// Every `t` value [`RevocationEvent`] accepts.
+pub const REVOCATION_ILKS: &[&str] = &[RevocationIlk::TEXT, BackedRevocationIlk::TEXT];
+
+/// The TEL event revoking a credential.
+///
+/// The `t` field chooses the variant: `rev` describes a registry with no backers, whose event names
+/// the registry in `ri`, while `brv` describes a backed one, whose event names it in `ra`. Decoding
+/// refuses any other `t`.
+///
+/// keripy writes `ra` rather than `ri` on a backed revocation, although KERIA's schema requires `ri`.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum RevocationEvent {
+    /// A revocation in a registry with no backers.
+    Unbacked(RevocationRecord),
+    /// A revocation in a registry with backers.
+    Backed(BackedRevocationRecord),
+}
+
+impl RevocationEvent {
+    /// Returns the ilk this event carries.
+    #[must_use]
+    pub const fn kind(&self) -> &'static str {
+        match self {
+            Self::Unbacked(_) => RevocationIlk::TEXT,
+            Self::Backed(_) => BackedRevocationIlk::TEXT,
+        }
+    }
+
+    /// Returns the event's SAID.
+    #[must_use]
+    pub fn digest(&self) -> &str {
+        match self {
+            Self::Unbacked(event) => &event.digest,
+            Self::Backed(event) => &event.digest,
+        }
+    }
+
+    /// Returns the credential SAID this event revokes.
+    #[must_use]
+    pub fn credential(&self) -> &str {
+        match self {
+            Self::Unbacked(event) => &event.credential,
+            Self::Backed(event) => &event.credential,
+        }
+    }
+
+    /// Returns the registry identifier.
+    #[must_use]
+    pub fn registry(&self) -> &str {
+        match self {
+            Self::Unbacked(event) => &event.registry,
+            Self::Backed(event) => &event.registry_anchor.identifier,
+        }
+    }
+}
+
+impl Serialize for RevocationEvent {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Unbacked(event) => event.serialize(serializer),
+            Self::Backed(event) => event.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for RevocationEvent {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let document = Value::deserialize(deserializer)?;
+        let ilk = document
+            .get("t")
+            .and_then(Value::as_str)
+            .ok_or_else(|| de::Error::missing_field("t"))?
+            .to_owned();
+        let event = match ilk.as_str() {
+            RevocationIlk::TEXT => serde_json::from_value(document).map(Self::Unbacked),
+            BackedRevocationIlk::TEXT => serde_json::from_value(document).map(Self::Backed),
+            other => return Err(de::Error::unknown_variant(other, REVOCATION_ILKS)),
+        };
+        event.map_err(de::Error::custom)
+    }
 }
 
 /// One key event from a key event log.
@@ -940,6 +1056,49 @@ mod tests {
         assert!(serde_json::from_str::<Threshold>("1").is_err());
         assert!(serde_json::from_str::<Threshold>("[1]").is_err());
         Ok(())
+    }
+
+    const UNBACKED_REVOCATION: &str = r#"{"v":"KERI10JSON000_","t":"rev","d":"EREV","i":"ECRED","s":"1","ri":"EREG","p":"EISS","dt":"2023-08-19T21:04:57.948863+00:00"}"#;
+    const BACKED_REVOCATION: &str = r#"{"v":"KERI10JSON000_","t":"brv","d":"EREV","i":"ECRED","s":"1","p":"EISS","ra":{"i":"EREG","s":"2","d":"EREGEV"},"dt":"2023-08-19T21:04:57.948863+00:00"}"#;
+
+    #[test]
+    fn the_ilk_chooses_the_revocation_shape() -> Result<(), Box<dyn Error>> {
+        let event: RevocationEvent = serde_json::from_str(UNBACKED_REVOCATION)?;
+        assert!(matches!(event, RevocationEvent::Unbacked(_)));
+        assert_eq!(event.kind(), "rev");
+        assert_eq!(event.digest(), "EREV");
+        assert_eq!(event.credential(), "ECRED");
+        assert_eq!(event.registry(), "EREG");
+        assert_eq!(serde_json::to_string(&event)?, UNBACKED_REVOCATION);
+
+        let event: RevocationEvent = serde_json::from_str(BACKED_REVOCATION)?;
+        assert!(matches!(event, RevocationEvent::Backed(_)));
+        assert_eq!(event.kind(), "brv");
+        assert_eq!(event.digest(), "EREV");
+        assert_eq!(event.credential(), "ECRED");
+        assert_eq!(event.registry(), "EREG");
+        assert_eq!(serde_json::to_string(&event)?, BACKED_REVOCATION);
+        Ok(())
+    }
+
+    #[test]
+    fn an_ilk_outside_rev_and_brv_is_refused() {
+        for ilk in ["iss", "bis", ""] {
+            let wrong = UNBACKED_REVOCATION.replace(r#""t":"rev""#, &format!(r#""t":"{ilk}""#));
+            assert!(
+                serde_json::from_str::<RevocationEvent>(&wrong).is_err(),
+                "ilk {ilk:?} was accepted"
+            );
+        }
+        assert!(serde_json::from_str::<RevocationEvent>(r#"{"v":"KERI10JSON000_"}"#).is_err());
+    }
+
+    #[test]
+    fn neither_revocation_shape_decodes_under_the_other_ilk() {
+        let relabelled = UNBACKED_REVOCATION.replace(r#""t":"rev""#, r#""t":"brv""#);
+        assert!(serde_json::from_str::<RevocationEvent>(&relabelled).is_err());
+        let relabelled = BACKED_REVOCATION.replace(r#""t":"brv""#, r#""t":"rev""#);
+        assert!(serde_json::from_str::<RevocationEvent>(&relabelled).is_err());
     }
 
     #[test]

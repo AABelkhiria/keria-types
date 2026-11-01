@@ -12,6 +12,9 @@
 - `api::UnbackedIssuance` and `api::BackedIssuance`, the two shapes of an issuance event.
 - `api::IssuanceIlk`, `api::BackedIssuanceIlk` and `api::ISSUANCE_ILKS`, the `t` values of an issuance event.
 - `IssuanceEvent::kind`, `digest`, `credential` and `registry`, which read what both shapes share.
+- `api::RevocationEvent`, a revocation of either shape, with `kind`, `digest`, `credential` and `registry`.
+- `api::BackedRevocationRecord`, a revocation in a registry with backers.
+- `api::BackedRevocationIlk` and `api::REVOCATION_ILKS`, the `t` values of a revocation event.
 
 ### Fixed
 
@@ -24,6 +27,8 @@
 - `IssuanceEvent` is now an enum of `UnbackedIssuance` and `BackedIssuance`, not a struct, so what both share is read
   through its accessors. A `bis` issuance carries `ii` and `ra` rather than `ri`, so a credential from a registry with
   backers failed to decode with ``missing field `ri` ``. The schema's `bis` with `ri` is now refused.
+- `MultisigRevocationEmbed.rev` is now `RevocationEvent`, not `RevocationRecord`, which accepted only `rev`, so a
+  revocation proposal for a registry with backers failed to decode.
 - `DelegatorMetadata.anchor` is now `Option<KeyEvent>`, not `Option<Anchor>`. KERIA echoes the approving
   event there, usually an `ixn`, so a real delegator operation failed to decode with ``missing field `pre` ``.
 

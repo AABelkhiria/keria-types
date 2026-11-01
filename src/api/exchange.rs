@@ -19,7 +19,7 @@ use serde_json::{Map, Value};
 
 use super::credential::IssuanceEvent;
 use super::error::ApiError;
-use super::message::{AcdcRecord, ExchangeRecord, KeyEvent, RegistryInceptionRecord, ReplyRecord, RevocationRecord};
+use super::message::{AcdcRecord, ExchangeRecord, KeyEvent, RegistryInceptionRecord, ReplyRecord, RevocationEvent};
 
 /// Ilks an inception slot accepts.
 const INCEPTION_ILKS: &[&str] = &["icp", "dip"];
@@ -113,7 +113,7 @@ pub struct MultisigIssuanceEmbed {
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct MultisigRevocationEmbed {
     /// The TEL revocation event.
-    pub rev: RevocationRecord,
+    pub rev: RevocationEvent,
     /// The key event anchoring it, wire label `anc`.
     pub anc: KeyEvent,
 }
@@ -270,6 +270,28 @@ mod tests {
         let document = format!(r#"{{"d":"EEMB","rev":{rev},"anc":{INTERACTION}}}"#);
         let embeds: ExchangeEmbeds = serde_json::from_str(&document)?;
         assert!(matches!(embeds.message, ExchangeEmbed::Revocation(_)));
+        assert_eq!(serde_json::to_string(&embeds)?, document);
+        Ok(())
+    }
+
+    #[test]
+    fn a_backed_credential_embed_decodes() -> Result<(), Box<dyn Error>> {
+        let acdc = r#"{"v":"ACDC10JSON000_","d":"ECRED","i":"EISS","ri":"EREG","s":"ESCH"}"#;
+        let bis = r#"{"v":"KERI10JSON000_","t":"bis","d":"EISSEV","i":"ECRED","ii":"EREG","s":"0","ra":{"i":"EREG","s":"1","d":"EREGEV"},"dt":"2023-08-19T21:04:57.948863+00:00"}"#;
+        let document = format!(r#"{{"d":"EEMB","acdc":{acdc},"iss":{bis},"anc":{INTERACTION}}}"#);
+        let embeds: ExchangeEmbeds = serde_json::from_str(&document)?;
+        let ExchangeEmbed::Issuance(embed) = &embeds.message else {
+            return Err("a backed issuance block decoded as something else".into());
+        };
+        assert_eq!(embed.iss.kind(), "bis");
+
+        let brv = r#"{"v":"KERI10JSON000_","t":"brv","d":"EREV","i":"ECRED","s":"1","p":"EISSEV","ra":{"i":"EREG","s":"2","d":"EREGEV"},"dt":"2023-08-19T21:04:57.948863+00:00"}"#;
+        let document = format!(r#"{{"d":"EEMB","rev":{brv},"anc":{INTERACTION}}}"#);
+        let embeds: ExchangeEmbeds = serde_json::from_str(&document)?;
+        let ExchangeEmbed::Revocation(embed) = &embeds.message else {
+            return Err("a backed revocation block decoded as something else".into());
+        };
+        assert_eq!(embed.rev.kind(), "brv");
         assert_eq!(serde_json::to_string(&embeds)?, document);
         Ok(())
     }

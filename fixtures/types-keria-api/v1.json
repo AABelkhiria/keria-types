@@ -8292,7 +8292,7 @@
       },
       "literal_accepted": true,
       "structural_accepted": true,
-      "rust_type": "RevocationRecord",
+      "rust_type": "RevocationEvent",
       "rust_expected": "accept"
     },
     {

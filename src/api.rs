@@ -22,7 +22,7 @@
 //! | Type | Wire shape | Where |
 //! |---|---|---|
 //! | [`Seal`] | `{s, d, i?}`, `s` a string | a key state query's anchor |
-//! | [`EventSeal`] | `{i, s, d}`, `s` a string | a registry's anchor, a backed issuance's or status's `ra` |
+//! | [`EventSeal`] | `{i, s, d}`, `s` a string | a registry's anchor, the `ra` of a backed issuance, revocation or status |
 //! | [`Anchor`] | `{pre, sn, d}`, `sn` a number | a credential's `anchor` |
 //! | [`StatusAnchor`] | `{s, d}`, `s` a number | a credential status's `a` |
 //!
@@ -66,8 +66,8 @@
 //! - **Unknown values of a closed code table are refused.** A `t`, `et`, or `tier` outside its
 //!   declared set selects which shape the rest of the document has, so accepting one would mean
 //!   accepting a document this crate cannot interpret. These are [`KeyEvent`], [`IssuanceEvent`],
-//!   [`RegistryEventKind`], [`UnbackedCredentialStatus`], [`BackedCredentialStatus`], and
-//!   [`KeyTier`].
+//!   [`RevocationEvent`], [`RegistryEventKind`], [`UnbackedCredentialStatus`],
+//!   [`BackedCredentialStatus`], and [`KeyTier`].
 //! - **An open registry keeps an escape hatch.** [`Role`] carries the nine roles the schema names
 //!   plus [`Role::Other`], because the KERI role registry is extensible and the schema itself types
 //!   an end role's `role` as a bare string while typing an OOBI's as an enum.
@@ -114,11 +114,11 @@ pub use identifier::{
 };
 pub use key_state::{AgentResourceResult, Controller, EstablishmentState, KeyState};
 pub use message::{
-    AcdcAttributes, AcdcRecord, Anchor, BackedIssuanceIlk, DelegatedInceptionIlk, DelegatedInceptionRecord,
-    DelegatedRotationIlk, EventSeal, ExchangeIlk, ExchangeRecord, InceptionIlk, InceptionRecord, InteractionIlk,
-    InteractionRecord, IssuanceIlk, KEY_EVENT_ILKS, KeyEvent, KeyEventRecord, RegistryInceptionIlk,
-    RegistryInceptionRecord, ReplyIlk, ReplyRecord, RevocationIlk, RevocationRecord, RotationIlk, RotationRecord,
-    Schema, Seal, Threshold,
+    AcdcAttributes, AcdcRecord, Anchor, BackedIssuanceIlk, BackedRevocationIlk, BackedRevocationRecord,
+    DelegatedInceptionIlk, DelegatedInceptionRecord, DelegatedRotationIlk, EventSeal, ExchangeIlk, ExchangeRecord,
+    InceptionIlk, InceptionRecord, InteractionIlk, InteractionRecord, IssuanceIlk, KEY_EVENT_ILKS, KeyEvent,
+    KeyEventRecord, REVOCATION_ILKS, RegistryInceptionIlk, RegistryInceptionRecord, ReplyIlk, ReplyRecord,
+    RevocationEvent, RevocationIlk, RevocationRecord, RotationIlk, RotationRecord, Schema, Seal, Threshold,
 };
 pub use operation::{
     ChallengeMetadata, ChallengeOperation, ChallengeResponse, CredentialMetadata, CredentialOperation,
