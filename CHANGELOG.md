@@ -14,6 +14,8 @@
 - `RegistryMetadata.anchor` and `RegistryResponse.anchor` are now `EventSeal`, not `Anchor`. KERIA sends
   the registry's `{i, s, d}` seal there, so a real registry operation failed to decode with ``missing field `pre` ``.
   The schema's `{pre, sn, d}` is now refused, and `RegistryMetadata` writes `anchor` before `depends`, as KERIA does.
+- `DelegatorMetadata.anchor` is now `Option<KeyEvent>`, not `Option<Anchor>`. KERIA echoes the approving
+  event there, usually an `ixn`, so a real delegator operation failed to decode with ``missing field `pre` ``.
 
 ## [0.1.0] - 2026-10-06
 

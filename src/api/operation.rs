@@ -323,7 +323,7 @@ impl EchoedSequence {
 /// [`EchoedSequence`] records for `sn`. A query **by anchor** sends the caller's seal — `{i, s,
 /// d}`, which is what `KeyStateQuery` builds and the reference's own `singlesig-dip` integration
 /// case passes — and a live KERIA 1.0.1 echoes that seal back unchanged, while the reference's
-/// generated schema and this crate's other operation families spell an anchor `{pre, sn, d}`.
+/// generated schema spells an anchor `{pre, sn, d}`.
 /// Typing the field as [`Anchor`] alone made every live anchor-query answer undecodable — found
 /// with the first anchor query driven against a live deployment. Both
 /// shapes are accepted and neither is rewritten into the other; they are disjoint, since one
@@ -450,9 +450,9 @@ pub struct DelegatorMetadata {
     pub pre: String,
     /// Delegated identifier prefix, wire label `teepre`.
     pub teepre: String,
-    /// Event the delegation is waiting to see anchored.
+    /// The delegator's key event approving the delegation, usually an `ixn`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub anchor: Option<Anchor>,
+    pub anchor: Option<KeyEvent>,
     /// The key-event operation this one is waiting on.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub depends: Option<Box<KelOperation>>,
@@ -703,6 +703,32 @@ mod tests {
 
         // The schema's `{pre, sn, d}` is never sent here.
         assert!(serde_json::from_str::<RegistryResponse>(r#"{"anchor":{"pre":"EABC","sn":1,"d":"EAB"}}"#).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn a_delegator_operation_carries_the_approving_event() -> Result<(), Box<dyn Error>> {
+        // A recorded poll of a delegation operation: the anchor is the `ixn` sent.
+        let answer = r#"{"name":"delegation.EG_0P_guMfPg8wGUdXtijxn0FAXhE8dxsk_077ENuQyC","metadata":{"pre":"EAHFgU5Izr_DfmW7Z5xl_8LWZVk0YnCAgQ7h3YGAnWXq","teepre":"ELbklFTYCKLoVAEW_wvu7JnnQE0ZxSqGbs7Xx7BqM4BL","anchor":{"v":"KERI10JSON00013a_","t":"ixn","d":"EG_0P_guMfPg8wGUdXtijxn0FAXhE8dxsk_077ENuQyC","i":"EAHFgU5Izr_DfmW7Z5xl_8LWZVk0YnCAgQ7h3YGAnWXq","s":"1","p":"EAHFgU5Izr_DfmW7Z5xl_8LWZVk0YnCAgQ7h3YGAnWXq","a":[{"i":"ELbklFTYCKLoVAEW_wvu7JnnQE0ZxSqGbs7Xx7BqM4BL","s":"0","d":"ELbklFTYCKLoVAEW_wvu7JnnQE0ZxSqGbs7Xx7BqM4BL"}]},"depends":{"name":"witness.EG_0P_guMfPg8wGUdXtijxn0FAXhE8dxsk_077ENuQyC","metadata":{"pre":"EAHFgU5Izr_DfmW7Z5xl_8LWZVk0YnCAgQ7h3YGAnWXq","sn":1},"done":false}},"response":"ELbklFTYCKLoVAEW_wvu7JnnQE0ZxSqGbs7Xx7BqM4BL","done":true}"#;
+        let operation: DelegatorOperation = serde_json::from_str(answer)?;
+        let metadata = operation
+            .metadata
+            .ok_or("the delegator operation carried no metadata")?;
+        let Some(KeyEvent::Interaction(anchor)) = metadata.anchor else {
+            return Err("the delegator operation carried no interaction".into());
+        };
+        assert_eq!(anchor.sequence_number, "1");
+        assert_eq!(anchor.identifier, metadata.pre);
+
+        // KERIA echoes the event without checking its ilk, and an `estOnly` delegator must rotate.
+        let rotated = r#"{"pre":"EABC","teepre":"ETEE","anchor":{"v":"KERI10JSON000_","t":"rot","d":"EROT","i":"EABC","s":"1","p":"EICP","kt":"1","k":["DAA"],"nt":"1","n":["EAA"],"bt":"0","br":[],"ba":[],"a":[]}}"#;
+        let metadata: DelegatorMetadata = serde_json::from_str(rotated)?;
+        assert!(matches!(metadata.anchor, Some(KeyEvent::Rotation(_))));
+
+        let absent = r#"{"pre":"EABC","teepre":"ETEE"}"#;
+        let metadata: DelegatorMetadata = serde_json::from_str(absent)?;
+        assert_eq!(metadata.anchor, None);
+        assert_eq!(serde_json::to_string(&metadata)?, absent);
         Ok(())
     }
 

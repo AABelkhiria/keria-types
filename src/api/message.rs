@@ -137,7 +137,7 @@ pub struct EventSeal {
     pub digest: String,
 }
 
-/// The event a long-running KERIA operation is waiting to see anchored.
+/// A key event named by its log, sequence number and digest.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct Anchor {
     /// Identifier prefix of the anchoring log, wire label `pre`.
