@@ -4,7 +4,7 @@ use serde::de;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::{Map, Value};
 
-use super::message::{AcdcRecord, Anchor, KeyEvent, Schema};
+use super::message::{AcdcRecord, Anchor, BackedIssuanceIlk, EventSeal, IssuanceIlk, KeyEvent, Schema};
 
 /// An object the schema declares as having no properties at all.
 ///
@@ -15,30 +15,15 @@ use super::message::{AcdcRecord, Anchor, KeyEvent, Schema};
 #[serde(deny_unknown_fields)]
 pub struct EmptyObject {}
 
-/// Whether a credential issuance is backed by a registry backer.
-#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
-pub enum IssuanceKind {
-    /// Unbacked issuance, ilk `iss`.
-    #[serde(rename = "iss")]
-    Unbacked,
-    /// Backed issuance, ilk `bis`.
-    #[serde(rename = "bis")]
-    Backed,
-}
-
-/// The TEL issuance event a credential was issued by.
-///
-/// The schema declares this shape twice: once as `IssEvent`, whose `t` is a two-value enum, and
-/// once as `ISS_V_1`, whose `t` is a bare string. One record covers both and takes the stricter
-/// spelling, so a `t` outside `iss` and `bis` is refused wherever the event appears.
+/// An issuance in a registry with no backers.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct IssuanceEvent {
+pub struct UnbackedIssuance {
     /// Version string, wire label `v`.
     #[serde(rename = "v")]
     pub version: String,
     /// Event kind, wire label `t`.
     #[serde(rename = "t")]
-    pub kind: IssuanceKind,
+    pub kind: IssuanceIlk,
     /// Event SAID, wire label `d`.
     #[serde(rename = "d")]
     pub digest: String,
@@ -54,6 +39,117 @@ pub struct IssuanceEvent {
     /// Timestamp, wire label `dt`.
     #[serde(rename = "dt")]
     pub stamp: String,
+}
+
+/// An issuance in a registry with backers.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct BackedIssuance {
+    /// Version string, wire label `v`.
+    #[serde(rename = "v")]
+    pub version: String,
+    /// Event kind, wire label `t`.
+    #[serde(rename = "t")]
+    pub kind: BackedIssuanceIlk,
+    /// Event SAID, wire label `d`.
+    #[serde(rename = "d")]
+    pub digest: String,
+    /// Credential SAID, wire label `i`.
+    #[serde(rename = "i")]
+    pub credential: String,
+    /// Registry identifier, wire label `ii`.
+    #[serde(rename = "ii")]
+    pub registry: String,
+    /// Sequence number in the credential's TEL, wire label `s`.
+    #[serde(rename = "s")]
+    pub sequence_number: String,
+    /// Where the registry stood at issuance, wire label `ra`.
+    #[serde(rename = "ra")]
+    pub registry_anchor: EventSeal,
+    /// Timestamp, wire label `dt`.
+    #[serde(rename = "dt")]
+    pub stamp: String,
+}
+
+/// Every `t` value [`IssuanceEvent`] accepts.
+pub const ISSUANCE_ILKS: &[&str] = &[IssuanceIlk::TEXT, BackedIssuanceIlk::TEXT];
+
+/// The TEL issuance event a credential was issued by.
+///
+/// The `t` field chooses the variant: `iss` describes a registry with no backers, whose event names
+/// the registry in `ri`, while `bis` describes a backed one, whose event names it in `ii` and adds
+/// `ra`. Decoding refuses any other `t`.
+///
+/// KERIA sends `ii` and `ra` on a backed issuance, although its schema declares `ri`.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum IssuanceEvent {
+    /// An issuance in a registry with no backers.
+    Unbacked(UnbackedIssuance),
+    /// An issuance in a registry with backers.
+    Backed(BackedIssuance),
+}
+
+impl IssuanceEvent {
+    /// Returns the ilk this event carries.
+    #[must_use]
+    pub const fn kind(&self) -> &'static str {
+        match self {
+            Self::Unbacked(_) => IssuanceIlk::TEXT,
+            Self::Backed(_) => BackedIssuanceIlk::TEXT,
+        }
+    }
+
+    /// Returns the event's SAID.
+    #[must_use]
+    pub fn digest(&self) -> &str {
+        match self {
+            Self::Unbacked(event) => &event.digest,
+            Self::Backed(event) => &event.digest,
+        }
+    }
+
+    /// Returns the credential SAID this event issues.
+    #[must_use]
+    pub fn credential(&self) -> &str {
+        match self {
+            Self::Unbacked(event) => &event.credential,
+            Self::Backed(event) => &event.credential,
+        }
+    }
+
+    /// Returns the registry identifier.
+    #[must_use]
+    pub fn registry(&self) -> &str {
+        match self {
+            Self::Unbacked(event) => &event.registry,
+            Self::Backed(event) => &event.registry,
+        }
+    }
+}
+
+impl Serialize for IssuanceEvent {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Unbacked(event) => event.serialize(serializer),
+            Self::Backed(event) => event.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for IssuanceEvent {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let document = Value::deserialize(deserializer)?;
+        let ilk = document
+            .get("t")
+            .and_then(Value::as_str)
+            .ok_or_else(|| de::Error::missing_field("t"))?
+            .to_owned();
+        let event = match ilk.as_str() {
+            IssuanceIlk::TEXT => serde_json::from_value(document).map(Self::Unbacked),
+            BackedIssuanceIlk::TEXT => serde_json::from_value(document).map(Self::Backed),
+            other => return Err(de::Error::unknown_variant(other, ISSUANCE_ILKS)),
+        };
+        event.map_err(de::Error::custom)
+    }
 }
 
 /// Status of a credential in a registry with no backers.
@@ -76,20 +172,6 @@ pub enum BackedCredentialStatus {
     /// Backed revocation, ilk `brv`.
     #[serde(rename = "brv")]
     Revoked,
-}
-
-/// Where a backed credential's registry stood when its status changed.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct RevocationAnchor {
-    /// Registry identifier, wire label `i`.
-    #[serde(rename = "i")]
-    pub registry: String,
-    /// Registry sequence number, wire label `s`.
-    #[serde(rename = "s")]
-    pub sequence_number: String,
-    /// Registry event digest, wire label `d`.
-    #[serde(rename = "d")]
-    pub digest: String,
 }
 
 /// Where a TEL event is anchored in the issuer's key event log.
@@ -166,7 +248,7 @@ pub struct BackedCredentialState {
     pub status: BackedCredentialStatus,
     /// Where the registry stood when the status changed, wire label `ra`.
     #[serde(rename = "ra")]
-    pub registry_anchor: RevocationAnchor,
+    pub registry_anchor: EventSeal,
 }
 
 /// The status of one credential.
@@ -338,6 +420,8 @@ mod tests {
     use std::error::Error;
 
     const UNBACKED: &str = r#"{"vn":[1,0],"i":"ECRED","s":"0","d":"EAB","ri":"EREG","a":{"s":1,"d":"EANC"},"dt":"2023-08-19T21:04:57.948863+00:00","et":"iss","ra":{}}"#;
+    const UNBACKED_ISSUANCE: &str = r#"{"v":"KERI10JSON0000ed_","t":"iss","d":"EAB","i":"ECRED","s":"0","ri":"EREG","dt":"2023-08-19T21:04:57.948863+00:00"}"#;
+    const BACKED_ISSUANCE: &str = r#"{"v":"KERI10JSON000160_","t":"bis","d":"EAB","i":"ECRED","ii":"EREG","s":"0","ra":{"i":"EREG","s":"1","d":"EREGEV"},"dt":"2023-08-19T21:04:57.948863+00:00"}"#;
     const BACKED: &str = r#"{"vn":[1,0],"i":"ECRED","s":"1","d":"EAB","ri":"EREG","a":{"s":2,"d":"EANC"},"dt":"2023-08-19T21:04:57.948863+00:00","et":"brv","ra":{"i":"EREG","s":"1","d":"EREGEV"}}"#;
 
     #[test]
@@ -401,26 +485,41 @@ mod tests {
     }
 
     #[test]
-    fn an_issuance_event_takes_the_stricter_of_the_two_schema_spellings() -> Result<(), Box<dyn Error>> {
-        let document = r#"{"v":"KERI10JSON0000ed_","t":"iss","d":"EAB","i":"ECRED","s":"0","ri":"EREG","dt":"2023-08-19T21:04:57.948863+00:00"}"#;
-        let event: IssuanceEvent = serde_json::from_str(document)?;
-        assert_eq!(event.kind, IssuanceKind::Unbacked);
-        assert_eq!(event.credential, "ECRED");
-        assert_eq!(serde_json::to_string(&event)?, document);
+    fn the_ilk_chooses_the_issuance_shape() -> Result<(), Box<dyn Error>> {
+        let event: IssuanceEvent = serde_json::from_str(UNBACKED_ISSUANCE)?;
+        assert_eq!(event.kind(), "iss");
+        assert_eq!(event.digest(), "EAB");
+        assert_eq!(event.credential(), "ECRED");
+        assert_eq!(event.registry(), "EREG");
+        assert_eq!(serde_json::to_string(&event)?, UNBACKED_ISSUANCE);
 
-        let backed = document.replace(r#""t":"iss""#, r#""t":"bis""#);
-        let event: IssuanceEvent = serde_json::from_str(&backed)?;
-        assert_eq!(event.kind, IssuanceKind::Backed);
+        let event: IssuanceEvent = serde_json::from_str(BACKED_ISSUANCE)?;
+        assert_eq!(event.kind(), "bis");
+        assert_eq!(event.digest(), "EAB");
+        assert_eq!(event.credential(), "ECRED");
+        assert_eq!(event.registry(), "EREG");
+        assert_eq!(serde_json::to_string(&event)?, BACKED_ISSUANCE);
+        Ok(())
+    }
 
-        // `ISS_V_1` types `t` as a bare string; this record does not.
-        for kind in ["rev", "icp", ""] {
-            let wrong = document.replace(r#""t":"iss""#, &format!(r#""t":"{kind}""#));
+    #[test]
+    fn an_ilk_outside_iss_and_bis_is_refused() {
+        for ilk in ["rev", "icp", ""] {
+            let wrong = UNBACKED_ISSUANCE.replace(r#""t":"iss""#, &format!(r#""t":"{ilk}""#));
             assert!(
                 serde_json::from_str::<IssuanceEvent>(&wrong).is_err(),
-                "ilk {kind:?} was accepted"
+                "ilk {ilk:?} was accepted"
             );
         }
-        Ok(())
+        assert!(serde_json::from_str::<IssuanceEvent>(r#"{"v":"KERI10JSON0000ed_"}"#).is_err());
+    }
+
+    #[test]
+    fn neither_issuance_shape_decodes_under_the_other_ilk() {
+        let relabelled = UNBACKED_ISSUANCE.replace(r#""t":"iss""#, r#""t":"bis""#);
+        assert!(serde_json::from_str::<IssuanceEvent>(&relabelled).is_err());
+        let relabelled = BACKED_ISSUANCE.replace(r#""t":"bis""#, r#""t":"iss""#);
+        assert!(serde_json::from_str::<IssuanceEvent>(&relabelled).is_err());
     }
 
     #[test]
@@ -451,7 +550,7 @@ mod tests {
         );
         let credential: Credential = serde_json::from_str(&document)?;
         assert_eq!(credential.sad.digest, "ECRED");
-        assert_eq!(credential.iss.kind, IssuanceKind::Unbacked);
+        assert_eq!(credential.iss.kind(), "iss");
         assert_eq!(credential.anc.kind(), "ixn");
         assert_eq!(credential.ancatc, ["-AAD"]);
         assert!(!credential.status.is_revoked());
@@ -462,6 +561,20 @@ mod tests {
             serde_json::from_str::<Value>(&serde_json::to_string(&credential)?)?,
             serde_json::from_str::<Value>(&document)?
         );
+        Ok(())
+    }
+
+    #[test]
+    fn a_credential_from_a_registry_with_backers_decodes() -> Result<(), Box<dyn Error>> {
+        let sad = r#"{"v":"ACDC10JSON000_","d":"ECRED","i":"EISS","ri":"EREG","s":"ESCH","a":{"d":"EATT","i":"EHOLD","LEI":"254900OP"}}"#;
+        let schema = r#"{"$id":"ESCH","$schema":"http://json-schema.org/draft-07/schema#","title":"t","description":"d","type":"object","credentialType":"c","version":"1.0.0","properties":{},"additionalProperties":false,"required":[]}"#;
+        let anc = r#"{"v":"KERI10JSON0000cb_","t":"ixn","d":"EANC","i":"EISS","s":"1","p":"EPP","a":[]}"#;
+        let document = format!(
+            r#"{{"sad":{sad},"atc":"-AAB","iss":{BACKED_ISSUANCE},"issatc":"-AAC","pre":"EISS","schema":{schema},"chains":[],"status":{BACKED},"anchor":{{"pre":"EISS","sn":1,"d":"EANC"}},"anc":{anc},"ancatc":["-AAD"]}}"#
+        );
+        let credential: Credential = serde_json::from_str(&document)?;
+        assert_eq!(credential.iss.kind(), "bis");
+        assert!(matches!(credential.status, CredentialState::Backed(_)));
         Ok(())
     }
 }

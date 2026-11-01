@@ -18,9 +18,9 @@ use keria_types::api::credential::{BackedCredentialStatus, RegistryEventKind, Un
 use keria_types::api::{
     AcceptedHab, AcdcAttributes, AcdcRecord, AgentConfig, AgentResourceResult, AidRecord, Anchor, Challenge, Contact,
     Controller, Credential, CredentialState, DoneOperation, EmptyObject, EndRole, EstablishmentState, ExchangeEmbeds,
-    ExchangeRecord, ExchangeResource, GroupMember, Hab, IssuanceEvent, IssuanceKind, KeyEvent, KeyEventRecord,
-    KeyState, KeyTier, MemberEnds, MultisigExchangeResource, MultisigInceptionEmbed, MultisigReplyEmbed, Notification,
-    Oobi, OperationStatus, PendingHab, RegistryInceptionRecord, RegistryOperation, RegistryState, ReplyRecord,
+    ExchangeRecord, ExchangeResource, GroupMember, Hab, IssuanceEvent, KeyEvent, KeyEventRecord, KeyState, KeyTier,
+    MemberEnds, MultisigExchangeResource, MultisigInceptionEmbed, MultisigReplyEmbed, Notification, Oobi,
+    OperationStatus, PendingHab, RegistryInceptionRecord, RegistryOperation, RegistryState, ReplyRecord,
     RevocationRecord, Role, SaltyState, Schema, Seal, UntypedOperation, WellKnown, WitnessOperation, from_json_slice,
     message,
 };
@@ -521,12 +521,11 @@ fn every_closed_code_table_matches_the_reference_enum() -> Result<(), Box<dyn Er
         Role::DECLARED.iter().map(Role::as_str).collect::<Vec<_>>()
     );
 
+    assert_eq!(values("IssEventT"), keria_types::api::ISSUANCE_ILKS);
+
     // Every declared value must decode into its Rust counterpart, and nothing else may.
     for value in values("Tier") {
         assert!(serde_json::from_str::<KeyTier>(&format!("\"{value}\"")).is_ok());
-    }
-    for value in values("IssEventT") {
-        assert!(serde_json::from_str::<IssuanceKind>(&format!("\"{value}\"")).is_ok());
     }
     for value in values("CredentialStateIssOrRevEt") {
         assert!(serde_json::from_str::<UnbackedCredentialStatus>(&format!("\"{value}\"")).is_ok());

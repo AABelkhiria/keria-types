@@ -22,8 +22,7 @@
 //! | Type | Wire shape | Where |
 //! |---|---|---|
 //! | [`Seal`] | `{s, d, i?}`, `s` a string | a key state query's anchor |
-//! | [`EventSeal`] | `{i, s, d}`, `s` a string | a registry's anchor |
-//! | [`RevocationAnchor`] | `{i, s, d}`, `s` a string | a backed credential status's `ra` |
+//! | [`EventSeal`] | `{i, s, d}`, `s` a string | a registry's anchor, a backed issuance's or status's `ra` |
 //! | [`Anchor`] | `{pre, sn, d}`, `sn` a number | a credential's `anchor` |
 //! | [`StatusAnchor`] | `{s, d}`, `s` a number | a credential status's `a` |
 //!
@@ -66,7 +65,7 @@
 //!   unknown fields are *captured* instead, so they survive a round trip.
 //! - **Unknown values of a closed code table are refused.** A `t`, `et`, or `tier` outside its
 //!   declared set selects which shape the rest of the document has, so accepting one would mean
-//!   accepting a document this crate cannot interpret. These are [`KeyEvent`], [`IssuanceKind`],
+//!   accepting a document this crate cannot interpret. These are [`KeyEvent`], [`IssuanceEvent`],
 //!   [`RegistryEventKind`], [`UnbackedCredentialStatus`], [`BackedCredentialStatus`], and
 //!   [`KeyTier`].
 //! - **An open registry keeps an escape hatch.** [`Role`] carries the nine roles the schema names
@@ -99,9 +98,9 @@ pub use contact::{
     Role, RoleEndpoints, WellKnown,
 };
 pub use credential::{
-    BackedCredentialState, BackedCredentialStatus, CREDENTIAL_STATUS_KINDS, Credential, CredentialState, EmptyObject,
-    IssuanceEvent, IssuanceKind, Registry, RegistryEventKind, RegistryState, RevocationAnchor, StatusAnchor,
-    UnbackedCredentialState, UnbackedCredentialStatus,
+    BackedCredentialState, BackedCredentialStatus, BackedIssuance, CREDENTIAL_STATUS_KINDS, Credential,
+    CredentialState, EmptyObject, ISSUANCE_ILKS, IssuanceEvent, Registry, RegistryEventKind, RegistryState,
+    StatusAnchor, UnbackedCredentialState, UnbackedCredentialStatus, UnbackedIssuance,
 };
 pub use error::ApiError;
 pub use exchange::{
@@ -115,10 +114,11 @@ pub use identifier::{
 };
 pub use key_state::{AgentResourceResult, Controller, EstablishmentState, KeyState};
 pub use message::{
-    AcdcAttributes, AcdcRecord, Anchor, DelegatedInceptionIlk, DelegatedInceptionRecord, DelegatedRotationIlk,
-    EventSeal, ExchangeIlk, ExchangeRecord, InceptionIlk, InceptionRecord, InteractionIlk, InteractionRecord,
-    KEY_EVENT_ILKS, KeyEvent, KeyEventRecord, RegistryInceptionIlk, RegistryInceptionRecord, ReplyIlk, ReplyRecord,
-    RevocationIlk, RevocationRecord, RotationIlk, RotationRecord, Schema, Seal, Threshold,
+    AcdcAttributes, AcdcRecord, Anchor, BackedIssuanceIlk, DelegatedInceptionIlk, DelegatedInceptionRecord,
+    DelegatedRotationIlk, EventSeal, ExchangeIlk, ExchangeRecord, InceptionIlk, InceptionRecord, InteractionIlk,
+    InteractionRecord, IssuanceIlk, KEY_EVENT_ILKS, KeyEvent, KeyEventRecord, RegistryInceptionIlk,
+    RegistryInceptionRecord, ReplyIlk, ReplyRecord, RevocationIlk, RevocationRecord, RotationIlk, RotationRecord,
+    Schema, Seal, Threshold,
 };
 pub use operation::{
     ChallengeMetadata, ChallengeOperation, ChallengeResponse, CredentialMetadata, CredentialOperation,

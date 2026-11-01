@@ -76,6 +76,9 @@ Two systemic effects fall out of that and explain most of the divergence table:
 
 ## Documents recorded as safe Rust divergences
 
+- **A backed issuance with `ri`.** `IssEvent` declares `ri` for both `iss` and `bis`. keripy's
+  `backerIssue` writes `ii` and `ra` instead, so Rust requires those on `bis` and refuses `ri`. No
+  document here is a `bis`; the tests in `src/api/credential.rs` cover it.
 - **A status sequence number as a string.** `credential` and the four `credential_status_*` documents
   carry `a.s` as a string, as the schema declares. KERIA sends a number, so Rust refuses them. The
   reference refuses them too, for the enum above, so they are not in `divergences`. The tests set

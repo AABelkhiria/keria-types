@@ -90,6 +90,8 @@ ilk_marker!(ReplyIlk, "rpy", "Reply, ilk `rpy`.");
 ilk_marker!(ExchangeIlk, "exn", "Exchange, ilk `exn`.");
 ilk_marker!(RegistryInceptionIlk, "vcp", "TEL registry inception, ilk `vcp`.");
 ilk_marker!(RevocationIlk, "rev", "TEL credential revocation, ilk `rev`.");
+ilk_marker!(IssuanceIlk, "iss", "TEL credential issuance, ilk `iss`.");
+ilk_marker!(BackedIssuanceIlk, "bis", "TEL backed credential issuance, ilk `bis`.");
 
 /// A signing, rotation, or witness threshold as a KERI message spells it.
 ///
