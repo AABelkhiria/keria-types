@@ -30,7 +30,7 @@ use serde_json::{Map, Value};
 
 use super::error::ApiError;
 use super::key_state::KeyState;
-use super::message::{AcdcRecord, Anchor, ExchangeRecord, KeyEvent, ReplyRecord, Seal};
+use super::message::{AcdcRecord, Anchor, EventSeal, ExchangeRecord, KeyEvent, ReplyRecord, Seal};
 
 /// Why a KERIA operation failed.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -255,8 +255,8 @@ impl UntypedOperation {
 
 /// Metadata naming a position in a key event log.
 ///
-/// The schema spells this shape four times, once per family — witness, delegation, group, and
-/// submit — with identical fields. The aliases below record the four names.
+/// The schema spells this shape once per family, with identical fields. The aliases below name it
+/// for the three families KERIA sends it on: witness, delegation and group.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct LogPositionMetadata {
     /// Identifier prefix whose log is being waited on.
@@ -271,14 +271,58 @@ pub type WitnessMetadata = LogPositionMetadata;
 pub type DelegationMetadata = LogPositionMetadata;
 /// Metadata of an operation waiting for a multisig group event.
 pub type GroupMetadata = LogPositionMetadata;
+
 /// Metadata of an operation waiting for an event to be submitted to witnesses.
-pub type SubmitMetadata = LogPositionMetadata;
+///
+/// KERIA writes `alias` here, although its schema declares `pre`.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct SubmitMetadata {
+    /// Name of the identifier whose event is being submitted.
+    pub alias: String,
+    /// Sequence number being submitted.
+    pub sn: u64,
+}
 
 /// Metadata of an operation resolving an OOBI.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct OobiMetadata {
     /// The OOBI URL being resolved.
     pub oobi: String,
+}
+
+/// What an OOBI operation returns when it completes.
+///
+/// KERIA also answers `{oobi}`, although its schema declares only a key state. The two share no
+/// required field, so the shapes cannot be mistaken for each other.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(untagged)]
+#[non_exhaustive]
+pub enum ResolvedOobi {
+    /// The key state of the controller the OOBI introduced.
+    KeyState(Box<KeyState>),
+    /// The URL alone, when KERIA knows no controller for the OOBI, as with an OOBI for a credential
+    /// schema.
+    Url(OobiMetadata),
+}
+
+impl ResolvedOobi {
+    /// Returns the introduced controller's key state, if any.
+    #[must_use]
+    pub fn key_state(&self) -> Option<&KeyState> {
+        match self {
+            Self::KeyState(state) => Some(state),
+            Self::Url(_) => None,
+        }
+    }
+
+    /// Consumes the response, returning the introduced controller's key state, if any.
+    #[must_use]
+    pub fn into_key_state(self) -> Option<KeyState> {
+        match self {
+            Self::KeyState(state) => Some(*state),
+            Self::Url(_) => None,
+        }
+    }
 }
 
 /// A sequence number as an agent echoed it back.
@@ -323,7 +367,7 @@ impl EchoedSequence {
 /// [`EchoedSequence`] records for `sn`. A query **by anchor** sends the caller's seal — `{i, s,
 /// d}`, which is what `KeyStateQuery` builds and the reference's own `singlesig-dip` integration
 /// case passes — and a live KERIA 1.0.1 echoes that seal back unchanged, while the reference's
-/// generated schema and this crate's other operation families spell an anchor `{pre, sn, d}`.
+/// generated schema spells an anchor `{pre, sn, d}`.
 /// Typing the field as [`Anchor`] alone made every live anchor-query answer undecodable — found
 /// with the first anchor query driven against a live deployment. Both
 /// shapes are accepted and neither is rewritten into the other; they are disjoint, since one
@@ -371,17 +415,17 @@ pub struct EndRoleMetadata {
 pub struct RegistryMetadata {
     /// Identifier prefix that owns the registry.
     pub pre: String,
+    /// Seal of the registry inception, waiting to be anchored in the owner's log.
+    pub anchor: EventSeal,
     /// The key-event operation this one is waiting on.
     pub depends: Box<KelOperation>,
-    /// Event the registry inception is waiting to see anchored.
-    pub anchor: Anchor,
 }
 
 /// The result of a completed registry operation.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct RegistryResponse {
-    /// The anchoring event.
-    pub anchor: Anchor,
+    /// Seal of the anchored registry inception.
+    pub anchor: EventSeal,
 }
 
 /// Metadata of an operation publishing a location scheme.
@@ -425,10 +469,10 @@ pub struct DoneMetadata {
     pub pre: Option<String>,
 }
 
-/// Metadata of an operation issuing or revoking a credential.
+/// Metadata of an operation issuing or verifying a credential.
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct CredentialMetadata {
-    /// The credential being issued, wire label `ced`.
+    /// The credential at stake, wire label `ced`.
     pub ced: AcdcRecord,
     /// The key-event operation this one is waiting on.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -450,9 +494,9 @@ pub struct DelegatorMetadata {
     pub pre: String,
     /// Delegated identifier prefix, wire label `teepre`.
     pub teepre: String,
-    /// Event the delegation is waiting to see anchored.
+    /// The delegator's key event approving the delegation, usually an `ixn`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub anchor: Option<Anchor>,
+    pub anchor: Option<KeyEvent>,
     /// The key-event operation this one is waiting on.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub depends: Option<Box<KelOperation>>,
@@ -513,8 +557,8 @@ pub enum KelMetadata {
     Done(Box<DoneMetadata>),
 }
 
-/// An operation that resolves an OOBI, returning the key state it discovered.
-pub type OobiOperation = Operation<OobiMetadata, KeyState>;
+/// An operation that resolves an OOBI, returning the controller's key state or the URL alone.
+pub type OobiOperation = Operation<OobiMetadata, ResolvedOobi>;
 /// An operation that queries another identifier's key state.
 pub type QueryOperation = Operation<QueryMetadata, KeyState>;
 /// An operation that authorizes an endpoint role, returning the reply that granted it.
@@ -535,7 +579,7 @@ pub type ExchangeOperation = Operation<ExchangeMetadata, ExchangeMetadata>;
 pub type SubmitOperation = Operation<SubmitMetadata, KeyState>;
 /// An operation that had already finished when it was created.
 pub type DoneOperation = Operation<DoneMetadata, KelResponse>;
-/// An operation that issues or revokes a credential.
+/// An operation that issues or verifies a credential.
 pub type CredentialOperation = Operation<CredentialMetadata, CredentialResponse>;
 /// An operation that waits for a multisig group event.
 pub type GroupOperation = Operation<GroupMetadata, KeyEvent>;
@@ -549,6 +593,7 @@ mod tests {
     use super::*;
     use std::error::Error;
 
+    const KEY_STATE: &str = r#"{"vn":[1,0],"i":"EAB","s":"0","p":"","d":"EAB","f":"0","dt":"2023-08-19T21:04:57.948863+00:00","et":"dip","kt":"1","k":["DMZh_y-H5C3cSbZZST-fqnsmdNTReZxIh0t2xSTOJQ8a"],"nt":"1","n":["EM9M2EQNCBK0MyAhVYBvR98Q0tefpvHgE-lHLs82XgqC"],"bt":"0","b":[],"c":[],"ee":{"s":"0","d":"EAB","br":[],"ba":[]},"di":"ELI7pg979AdhmvrjDeam2eAO2SR5niCgnjAJXJHtJose"}"#;
     const PENDING: &str = r#"{"name":"witness.EABC","metadata":{"pre":"EABC","sn":0},"done":false}"#;
 
     #[test]
@@ -627,7 +672,55 @@ mod tests {
         let typed: WitnessOperation = untyped.clone().into_typed()?;
         assert_eq!(typed.metadata.map(|metadata| metadata.pre), Some("EABC".to_owned()));
         // The wrong family is a typed failure rather than a silent misreading.
-        assert!(untyped.into_typed::<OobiMetadata, KeyState>().is_err());
+        assert!(untyped.into_typed::<OobiMetadata, ResolvedOobi>().is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn an_oobi_operation_with_no_known_controller_returns_the_url() -> Result<(), Box<dyn Error>> {
+        let answer = r#"{"name":"oobi.E","metadata":{"oobi":"http://h/oobi/E"},"response":{"oobi":"http://h/oobi/E"},"done":true}"#;
+        let operation: OobiOperation = serde_json::from_str(answer)?;
+        let resolved = operation
+            .outcome
+            .response()
+            .ok_or("the operation carried no response")?;
+        assert!(matches!(resolved, ResolvedOobi::Url(url) if url.oobi == "http://h/oobi/E"));
+        assert_eq!(resolved.key_state(), None);
+        assert_eq!(serde_json::to_string(&operation)?, answer);
+        Ok(())
+    }
+
+    #[test]
+    fn an_oobi_operation_with_a_known_controller_returns_its_key_state() -> Result<(), Box<dyn Error>> {
+        let answer = format!(
+            r#"{{"name":"oobi.E","metadata":{{"oobi":"http://h/oobi/E"}},"response":{KEY_STATE},"done":true}}"#
+        );
+        let operation: OobiOperation = serde_json::from_str(&answer)?;
+        let resolved = operation
+            .outcome
+            .response()
+            .ok_or("the operation carried no response")?;
+        assert!(matches!(resolved, ResolvedOobi::KeyState(_)));
+        assert_eq!(resolved.key_state().map(|state| state.identifier.as_str()), Some("EAB"));
+        assert!(resolved.clone().into_key_state().is_some());
+        assert_eq!(serde_json::to_string(&operation)?, answer);
+
+        // A response matching neither shape is refused rather than guessed at.
+        assert!(serde_json::from_str::<ResolvedOobi>(r#"{"$id":"ESCH"}"#).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn a_submit_operation_names_the_identifier_by_its_alias() -> Result<(), Box<dyn Error>> {
+        let pending = r#"{"name":"submit.EABC","metadata":{"alias":"aid","sn":3},"done":false}"#;
+        let operation: SubmitOperation = serde_json::from_str(pending)?;
+        let metadata = operation.metadata.as_ref().ok_or("the operation carried no metadata")?;
+        assert_eq!(metadata.alias, "aid");
+        assert_eq!(metadata.sn, 3);
+        assert_eq!(serde_json::to_string(&operation)?, pending);
+
+        // The schema's `{pre, sn}` is never sent here.
+        assert!(serde_json::from_str::<SubmitMetadata>(r#"{"pre":"EABC","sn":3}"#).is_err());
         Ok(())
     }
 
@@ -665,13 +758,70 @@ mod tests {
     fn a_dependent_operation_nests_its_dependency() -> Result<(), Box<dyn Error>> {
         let depends = r#"{"name":"witness.EABC","metadata":{"pre":"EABC","sn":0},"done":false}"#;
         let document = format!(
-            r#"{{"name":"registry.EREG","metadata":{{"pre":"EABC","depends":{depends},"anchor":{{"pre":"EABC","sn":1,"d":"EAB"}}}},"done":false}}"#
+            r#"{{"name":"registry.EREG","metadata":{{"pre":"EABC","anchor":{{"i":"EREG","s":"0","d":"EREG"}},"depends":{depends}}},"done":false}}"#
         );
         let operation: RegistryOperation = serde_json::from_str(&document)?;
         let metadata = operation.metadata.as_ref().ok_or("registry metadata was dropped")?;
-        assert_eq!(metadata.anchor.sn, 1);
+        assert_eq!(metadata.anchor.sequence_number, "0");
         assert!(matches!(metadata.depends.metadata, Some(KelMetadata::Log(_))));
         assert_eq!(serde_json::to_string(&operation)?, document);
+        Ok(())
+    }
+
+    #[test]
+    fn a_registry_operation_carries_the_seal_of_the_registry() -> Result<(), Box<dyn Error>> {
+        // KERIA seals the registry to itself: `i` and `d` are both its prefix, not the owner's.
+        let seal = r#"{"i":"EREG","s":"0","d":"EREG"}"#;
+        let metadata = format!(
+            r#"{{"pre":"EABC","anchor":{seal},"depends":{{"name":"witness.EIXN","metadata":{{"pre":"EABC","sn":1}},"done":false,"error":null,"response":null}}}}"#
+        );
+        let decoded: RegistryMetadata = serde_json::from_str(&metadata)?;
+        assert_eq!(decoded.anchor.identifier, "EREG");
+        assert_eq!(decoded.anchor.sequence_number, "0");
+        assert_eq!(decoded.anchor.digest, "EREG");
+
+        let response = format!(r#"{{"anchor":{seal}}}"#);
+        let decoded: RegistryResponse = serde_json::from_str(&response)?;
+        assert_eq!(decoded.anchor.identifier, "EREG");
+        assert_eq!(serde_json::to_string(&decoded)?, response);
+
+        let completed = format!(
+            r#"{{"name":"registry.EREG","metadata":{metadata},"done":true,"error":null,"response":{response}}}"#
+        );
+        let operation: RegistryOperation = serde_json::from_str(&completed)?;
+        assert_eq!(
+            operation.outcome.response().map(|done| done.anchor.digest.as_str()),
+            Some("EREG")
+        );
+
+        // The schema's `{pre, sn, d}` is never sent here.
+        assert!(serde_json::from_str::<RegistryResponse>(r#"{"anchor":{"pre":"EABC","sn":1,"d":"EAB"}}"#).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn a_delegator_operation_carries_the_approving_event() -> Result<(), Box<dyn Error>> {
+        // A recorded poll of a delegation operation: the anchor is the `ixn` sent.
+        let answer = r#"{"name":"delegation.EG_0P_guMfPg8wGUdXtijxn0FAXhE8dxsk_077ENuQyC","metadata":{"pre":"EAHFgU5Izr_DfmW7Z5xl_8LWZVk0YnCAgQ7h3YGAnWXq","teepre":"ELbklFTYCKLoVAEW_wvu7JnnQE0ZxSqGbs7Xx7BqM4BL","anchor":{"v":"KERI10JSON00013a_","t":"ixn","d":"EG_0P_guMfPg8wGUdXtijxn0FAXhE8dxsk_077ENuQyC","i":"EAHFgU5Izr_DfmW7Z5xl_8LWZVk0YnCAgQ7h3YGAnWXq","s":"1","p":"EAHFgU5Izr_DfmW7Z5xl_8LWZVk0YnCAgQ7h3YGAnWXq","a":[{"i":"ELbklFTYCKLoVAEW_wvu7JnnQE0ZxSqGbs7Xx7BqM4BL","s":"0","d":"ELbklFTYCKLoVAEW_wvu7JnnQE0ZxSqGbs7Xx7BqM4BL"}]},"depends":{"name":"witness.EG_0P_guMfPg8wGUdXtijxn0FAXhE8dxsk_077ENuQyC","metadata":{"pre":"EAHFgU5Izr_DfmW7Z5xl_8LWZVk0YnCAgQ7h3YGAnWXq","sn":1},"done":false}},"response":"ELbklFTYCKLoVAEW_wvu7JnnQE0ZxSqGbs7Xx7BqM4BL","done":true}"#;
+        let operation: DelegatorOperation = serde_json::from_str(answer)?;
+        let metadata = operation
+            .metadata
+            .ok_or("the delegator operation carried no metadata")?;
+        let Some(KeyEvent::Interaction(anchor)) = metadata.anchor else {
+            return Err("the delegator operation carried no interaction".into());
+        };
+        assert_eq!(anchor.sequence_number, "1");
+        assert_eq!(anchor.identifier, metadata.pre);
+
+        // KERIA echoes the event without checking its ilk, and an `estOnly` delegator must rotate.
+        let rotated = r#"{"pre":"EABC","teepre":"ETEE","anchor":{"v":"KERI10JSON000_","t":"rot","d":"EROT","i":"EABC","s":"1","p":"EICP","kt":"1","k":["DAA"],"nt":"1","n":["EAA"],"bt":"0","br":[],"ba":[],"a":[]}}"#;
+        let metadata: DelegatorMetadata = serde_json::from_str(rotated)?;
+        assert!(matches!(metadata.anchor, Some(KeyEvent::Rotation(_))));
+
+        let absent = r#"{"pre":"EABC","teepre":"ETEE"}"#;
+        let metadata: DelegatorMetadata = serde_json::from_str(absent)?;
+        assert_eq!(metadata.anchor, None);
+        assert_eq!(serde_json::to_string(&metadata)?, absent);
         Ok(())
     }
 

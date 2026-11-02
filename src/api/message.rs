@@ -21,6 +21,7 @@
 //! `signify-keri::serialization`.
 
 use core::fmt;
+use std::collections::BTreeMap;
 
 use serde::de::{self, Unexpected, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -90,23 +91,71 @@ ilk_marker!(ReplyIlk, "rpy", "Reply, ilk `rpy`.");
 ilk_marker!(ExchangeIlk, "exn", "Exchange, ilk `exn`.");
 ilk_marker!(RegistryInceptionIlk, "vcp", "TEL registry inception, ilk `vcp`.");
 ilk_marker!(RevocationIlk, "rev", "TEL credential revocation, ilk `rev`.");
+ilk_marker!(
+    BackedRevocationIlk,
+    "brv",
+    "TEL backed credential revocation, ilk `brv`."
+);
+ilk_marker!(IssuanceIlk, "iss", "TEL credential issuance, ilk `iss`.");
+ilk_marker!(BackedIssuanceIlk, "bis", "TEL backed credential issuance, ilk `bis`.");
 
 /// A signing, rotation, or witness threshold as a KERI message spells it.
 ///
-/// The schema writes a threshold three ways: a single value such as `"1"` or `"1/2"`, one clause of
-/// weights, or several clauses. A key state declares only the first two forms and a key event all
-/// three; this one type covers both positions, which is a deliberate widening of the key-state
-/// field. Weights stay as written — reducing a rational and deciding
-/// whether a threshold is satisfied is `signify-keri::threshold`, which owns exact arithmetic.
+/// A threshold is a single value such as `"1"` or `"1/2"`, one clause of weights, or several
+/// clauses. This one type covers key events and key states, whose schema declares fewer forms.
+/// Weights stay as written: reducing a rational and deciding whether a threshold is satisfied is
+/// `keri_protocol::threshold`, which does not yet read nested weights.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum Threshold {
     /// One value, such as `"1"` or `"1/2"`.
     Simple(String),
     /// One clause of weights, such as `["1/2", "1/2", "1/2"]`.
-    Clause(Vec<String>),
+    Clause(Vec<ThresholdWeight>),
     /// Several weighted clauses, all of which must be satisfied.
-    Clauses(Vec<Vec<String>>),
+    Clauses(Vec<Vec<ThresholdWeight>>),
+}
+
+/// One entry of a weighted threshold clause.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(untagged)]
+pub enum ThresholdWeight {
+    /// A plain weight, such as `"1/2"`.
+    Simple(String),
+    /// A group of keys with a weight of its own.
+    Nested(NestedWeight),
+}
+
+/// A group of keys that adds its weight to a clause only when its own weights sum to 1.
+///
+/// `[{"1/2": ["1/2", "1/2", "1/2"]}, "1/2"]` covers four keys and requires any two of the first
+/// three plus the fourth. keripy writes these, although KERIA's schema declares only strings.
+///
+/// The wire form is an object with exactly one key, the group's weight.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NestedWeight {
+    /// The weight the group adds to its clause.
+    pub weight: String,
+    /// The weights of the keys in the group.
+    pub members: Vec<String>,
+}
+
+impl Serialize for NestedWeight {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.collect_map([(&self.weight, &self.members)])
+    }
+}
+
+impl<'de> Deserialize<'de> for NestedWeight {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let entries = BTreeMap::<String, Vec<String>>::deserialize(deserializer)?;
+        let count = entries.len();
+        let mut entries = entries.into_iter();
+        match (entries.next(), entries.next()) {
+            (Some((weight, members)), None) => Ok(Self { weight, members }),
+            _ => Err(de::Error::invalid_length(count, &"exactly one weight")),
+        }
+    }
 }
 
 /// A seal anchored in a key event, naming an event in another log.
@@ -123,7 +172,21 @@ pub struct Seal {
     pub identifier: Option<String>,
 }
 
-/// The event a long-running KERIA operation is waiting to see anchored.
+/// A seal naming an event in another log, with every field required and written in KERI's `{i, s, d}` order.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct EventSeal {
+    /// Identifier prefix of the sealed log, wire label `i`.
+    #[serde(rename = "i")]
+    pub identifier: String,
+    /// Sequence number of the sealed event, wire label `s`.
+    #[serde(rename = "s")]
+    pub sequence_number: String,
+    /// Digest of the sealed event, wire label `d`.
+    #[serde(rename = "d")]
+    pub digest: String,
+}
+
+/// A key event named by its log, sequence number and digest.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct Anchor {
     /// Identifier prefix of the anchoring log, wire label `pre`.
@@ -542,7 +605,7 @@ pub struct RegistryInceptionRecord {
     pub nonce: String,
 }
 
-/// A TEL credential revocation event as KERIA returns it, ilk `rev`.
+/// A TEL credential revocation event in a registry with no backers, ilk `rev`.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct RevocationRecord {
     /// Version string, wire label `v`.
@@ -569,6 +632,117 @@ pub struct RevocationRecord {
     /// Timestamp, wire label `dt`.
     #[serde(rename = "dt")]
     pub stamp: String,
+}
+
+/// A TEL credential revocation event in a registry with backers, ilk `brv`.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct BackedRevocationRecord {
+    /// Version string, wire label `v`.
+    #[serde(rename = "v")]
+    pub version: String,
+    /// Event kind, wire label `t`.
+    #[serde(rename = "t")]
+    pub kind: BackedRevocationIlk,
+    /// Event SAID, wire label `d`.
+    #[serde(rename = "d")]
+    pub digest: String,
+    /// Credential SAID, wire label `i`.
+    #[serde(rename = "i")]
+    pub credential: String,
+    /// Sequence number, wire label `s`.
+    #[serde(rename = "s")]
+    pub sequence_number: String,
+    /// Prior TEL event digest, wire label `p`.
+    #[serde(rename = "p")]
+    pub prior: String,
+    /// Where the registry stood at revocation, wire label `ra`.
+    #[serde(rename = "ra")]
+    pub registry_anchor: EventSeal,
+    /// Timestamp, wire label `dt`.
+    #[serde(rename = "dt")]
+    pub stamp: String,
+}
+
+/// Every `t` value [`RevocationEvent`] accepts.
+pub const REVOCATION_ILKS: &[&str] = &[RevocationIlk::TEXT, BackedRevocationIlk::TEXT];
+
+/// The TEL event revoking a credential.
+///
+/// The `t` field chooses the variant: `rev` describes a registry with no backers, whose event names
+/// the registry in `ri`, while `brv` describes a backed one, whose event names it in `ra`. Decoding
+/// refuses any other `t`.
+///
+/// keripy writes `ra` rather than `ri` on a backed revocation, although KERIA's schema requires `ri`.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum RevocationEvent {
+    /// A revocation in a registry with no backers.
+    Unbacked(RevocationRecord),
+    /// A revocation in a registry with backers.
+    Backed(BackedRevocationRecord),
+}
+
+impl RevocationEvent {
+    /// Returns the ilk this event carries.
+    #[must_use]
+    pub const fn kind(&self) -> &'static str {
+        match self {
+            Self::Unbacked(_) => RevocationIlk::TEXT,
+            Self::Backed(_) => BackedRevocationIlk::TEXT,
+        }
+    }
+
+    /// Returns the event's SAID.
+    #[must_use]
+    pub fn digest(&self) -> &str {
+        match self {
+            Self::Unbacked(event) => &event.digest,
+            Self::Backed(event) => &event.digest,
+        }
+    }
+
+    /// Returns the credential SAID this event revokes.
+    #[must_use]
+    pub fn credential(&self) -> &str {
+        match self {
+            Self::Unbacked(event) => &event.credential,
+            Self::Backed(event) => &event.credential,
+        }
+    }
+
+    /// Returns the registry identifier.
+    #[must_use]
+    pub fn registry(&self) -> &str {
+        match self {
+            Self::Unbacked(event) => &event.registry,
+            Self::Backed(event) => &event.registry_anchor.identifier,
+        }
+    }
+}
+
+impl Serialize for RevocationEvent {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Unbacked(event) => event.serialize(serializer),
+            Self::Backed(event) => event.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for RevocationEvent {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let document = Value::deserialize(deserializer)?;
+        let ilk = document
+            .get("t")
+            .and_then(Value::as_str)
+            .ok_or_else(|| de::Error::missing_field("t"))?
+            .to_owned();
+        let event = match ilk.as_str() {
+            RevocationIlk::TEXT => serde_json::from_value(document).map(Self::Unbacked),
+            BackedRevocationIlk::TEXT => serde_json::from_value(document).map(Self::Backed),
+            other => return Err(de::Error::unknown_variant(other, REVOCATION_ILKS)),
+        };
+        event.map_err(de::Error::custom)
+    }
 }
 
 /// One key event from a key event log.
@@ -907,14 +1081,21 @@ mod tests {
         Ok(())
     }
 
+    fn half() -> ThresholdWeight {
+        ThresholdWeight::Simple("1/2".to_owned())
+    }
+
     #[test]
     fn a_threshold_keeps_the_shape_it_arrived_in() -> Result<(), Box<dyn Error>> {
         for (document, expected) in [
             (r#""1""#, Threshold::Simple("1".to_owned())),
-            (r#"["1/2","1/2"]"#, Threshold::Clause(vec!["1/2".into(), "1/2".into()])),
+            (r#"["1/2","1/2"]"#, Threshold::Clause(vec![half(), half()])),
             (
                 r#"[["1/2","1/2"],["1"]]"#,
-                Threshold::Clauses(vec![vec!["1/2".into(), "1/2".into()], vec!["1".into()]]),
+                Threshold::Clauses(vec![
+                    vec![half(), half()],
+                    vec![ThresholdWeight::Simple("1".to_owned())],
+                ]),
             ),
         ] {
             let threshold: Threshold = serde_json::from_str(document)?;
@@ -926,6 +1107,93 @@ mod tests {
         Ok(())
     }
 
+    const UNBACKED_REVOCATION: &str = r#"{"v":"KERI10JSON000_","t":"rev","d":"EREV","i":"ECRED","s":"1","ri":"EREG","p":"EISS","dt":"2023-08-19T21:04:57.948863+00:00"}"#;
+    const BACKED_REVOCATION: &str = r#"{"v":"KERI10JSON000_","t":"brv","d":"EREV","i":"ECRED","s":"1","p":"EISS","ra":{"i":"EREG","s":"2","d":"EREGEV"},"dt":"2023-08-19T21:04:57.948863+00:00"}"#;
+
+    #[test]
+    fn the_ilk_chooses_the_revocation_shape() -> Result<(), Box<dyn Error>> {
+        let event: RevocationEvent = serde_json::from_str(UNBACKED_REVOCATION)?;
+        assert!(matches!(event, RevocationEvent::Unbacked(_)));
+        assert_eq!(event.kind(), "rev");
+        assert_eq!(event.digest(), "EREV");
+        assert_eq!(event.credential(), "ECRED");
+        assert_eq!(event.registry(), "EREG");
+        assert_eq!(serde_json::to_string(&event)?, UNBACKED_REVOCATION);
+
+        let event: RevocationEvent = serde_json::from_str(BACKED_REVOCATION)?;
+        assert!(matches!(event, RevocationEvent::Backed(_)));
+        assert_eq!(event.kind(), "brv");
+        assert_eq!(event.digest(), "EREV");
+        assert_eq!(event.credential(), "ECRED");
+        assert_eq!(event.registry(), "EREG");
+        assert_eq!(serde_json::to_string(&event)?, BACKED_REVOCATION);
+        Ok(())
+    }
+
+    #[test]
+    fn an_ilk_outside_rev_and_brv_is_refused() {
+        for ilk in ["iss", "bis", ""] {
+            let wrong = UNBACKED_REVOCATION.replace(r#""t":"rev""#, &format!(r#""t":"{ilk}""#));
+            assert!(
+                serde_json::from_str::<RevocationEvent>(&wrong).is_err(),
+                "ilk {ilk:?} was accepted"
+            );
+        }
+        assert!(serde_json::from_str::<RevocationEvent>(r#"{"v":"KERI10JSON000_"}"#).is_err());
+    }
+
+    #[test]
+    fn neither_revocation_shape_decodes_under_the_other_ilk() {
+        let relabelled = UNBACKED_REVOCATION.replace(r#""t":"rev""#, r#""t":"brv""#);
+        assert!(serde_json::from_str::<RevocationEvent>(&relabelled).is_err());
+        let relabelled = BACKED_REVOCATION.replace(r#""t":"brv""#, r#""t":"rev""#);
+        assert!(serde_json::from_str::<RevocationEvent>(&relabelled).is_err());
+    }
+
+    #[test]
+    fn a_threshold_keeps_a_nested_weight() -> Result<(), Box<dyn Error>> {
+        let clause = r#"[{"1/2":["1/2","1/2"]},"1/2"]"#;
+        let threshold: Threshold = serde_json::from_str(clause)?;
+        let nested = NestedWeight {
+            weight: "1/2".to_owned(),
+            members: vec!["1/2".to_owned(), "1/2".to_owned()],
+        };
+        assert_eq!(
+            threshold,
+            Threshold::Clause(vec![ThresholdWeight::Nested(nested), half()])
+        );
+        assert_eq!(serde_json::to_string(&threshold)?, clause);
+
+        let clauses = r#"[["1/2","1/2"],[{"1/3":["1/2","1/2"]},"2/3"]]"#;
+        let threshold: Threshold = serde_json::from_str(clauses)?;
+        assert!(matches!(threshold, Threshold::Clauses(_)));
+        assert_eq!(serde_json::to_string(&threshold)?, clauses);
+
+        let rotation = ROTATION_AT_ZERO.replace(r#""kt":"2""#, &format!(r#""kt":{clause}"#));
+        let event: KeyEvent = serde_json::from_str(&rotation)?;
+        assert_eq!(serde_json::to_string(&event)?, rotation);
+        Ok(())
+    }
+
+    #[test]
+    fn a_malformed_threshold_weight_is_refused() {
+        for wrong in [
+            r#"[{"1/2":"1/2"}]"#,
+            r#"[{"1/2":[1]}]"#,
+            "[[1]]",
+            "[{}]",
+            "[[{}]]",
+            r#"[{"1/2":["1"],"1/3":["1"]}]"#,
+            r#"[{"1/2":[{"1/2":["1"]}]}]"#,
+            r#"{"1/2":["1"]}"#,
+        ] {
+            assert!(
+                serde_json::from_str::<Threshold>(wrong).is_err(),
+                "{wrong} was accepted"
+            );
+        }
+    }
+
     #[test]
     fn a_seal_omits_the_identifier_it_did_not_carry() -> Result<(), Box<dyn Error>> {
         let seal: Seal = serde_json::from_str(r#"{"s":"0","d":"EAB"}"#)?;
@@ -935,6 +1203,21 @@ mod tests {
         let full: Seal = serde_json::from_str(r#"{"s":"0","d":"EAB","i":"ECD"}"#)?;
         assert_eq!(full.identifier.as_deref(), Some("ECD"));
         assert_eq!(serde_json::to_string(&full)?, r#"{"s":"0","d":"EAB","i":"ECD"}"#);
+        Ok(())
+    }
+
+    #[test]
+    fn an_event_seal_requires_every_field_and_keeps_keris_order() -> Result<(), Box<dyn Error>> {
+        let wire = r#"{"i":"ECD","s":"0","d":"EAB"}"#;
+        let seal: EventSeal = serde_json::from_str(wire)?;
+        assert_eq!(seal.sequence_number, "0");
+        assert_eq!(serde_json::to_string(&seal)?, wire);
+        for wrong in [r#"{"s":"0","d":"EAB"}"#, r#"{"i":"ECD","s":0,"d":"EAB"}"#] {
+            assert!(
+                serde_json::from_str::<EventSeal>(wrong).is_err(),
+                "{wrong} was accepted"
+            );
+        }
         Ok(())
     }
 

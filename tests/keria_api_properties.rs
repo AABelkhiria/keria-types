@@ -81,6 +81,15 @@ fn unknown_name() -> impl Strategy<Value = String> {
     "zz[a-z]{1,8}".prop_map(|name| name)
 }
 
+/// A plain weight, or a group of keys under a weight of its own.
+fn threshold_weight() -> impl Strategy<Value = Value> {
+    prop_oneof![
+        "[0-9]/[0-9]".prop_map(|weight| json!(weight)),
+        ("[0-9]/[0-9]", prop::collection::vec("[0-9]/[0-9]", 0..3))
+            .prop_map(|(weight, members)| json!({ weight: members })),
+    ]
+}
+
 proptest! {
     /// A record decoded from a document re-encodes to something that decodes to the same record.
     ///
@@ -309,11 +318,16 @@ proptest! {
             prop::collection::vec("[0-9]/[0-9]", 0..5).prop_map(|clause| json!(clause)),
             prop::collection::vec(prop::collection::vec("[0-9]/[0-9]", 0..3), 0..3)
                 .prop_map(|clauses| json!(clauses)),
+            prop::collection::vec(threshold_weight(), 0..4).prop_map(|clause| json!(clause)),
+            prop::collection::vec(prop::collection::vec(threshold_weight(), 1..4), 1..3)
+                .prop_map(|clauses| json!(clauses)),
         ],
     ) {
         let decoded: Threshold = decode(&threshold)?;
         let encoded = to_json_string(&decoded)?;
-        prop_assert_eq!(serde_json::from_str::<Value>(&encoded)?, threshold);
+        prop_assert_eq!(&serde_json::from_str::<Value>(&encoded)?, &threshold);
+        let clauses = threshold.as_array().is_some_and(|items| items.iter().any(Value::is_array));
+        prop_assert_eq!(matches!(decoded, Threshold::Clauses(_)), clauses);
     }
 
     /// The order a record writes its fields in never depends on the order they arrived in.

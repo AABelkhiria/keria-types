@@ -28,8 +28,8 @@ called. The reference for this module is therefore the TypeScript compiler itsel
 file writes them — every field, whether it is optional, and the type it is written as — extracted
 from the syntax tree. `enums` holds the six enum declarations, `key_state_exports` the 78 aliases
 `keyState.ts` defines, and `key_state_functions` its two exported guards. A Rust test asserts its
-own model against this, so a schema drifting out from under the port becomes a failing test rather
-than a silent incompatibility.
+own model against this, so a schema drifting out from under a record a document exercises becomes a
+failing test rather than a silent incompatibility.
 
 **Documents are type-checked.** Each entry in `documents` is a JSON document checked against a named
 schema by the pinned compiler, twice:
@@ -40,8 +40,9 @@ schema by the pinned compiler, twice:
   excess-property check but widens literal types.
 
 Each document also records `rust_type` and `rust_expected`: what this port decodes it as and whether
-decoding succeeds. `divergences` lists, computed rather than transcribed, every document the two
-decide differently.
+decoding succeeds. `divergences` lists every document the two decide differently. The generator computed
+both; since it was not carried over, changes to them are made by hand, and the reference columns stay
+as generated.
 
 ## Provenance of the OpenAPI document
 
@@ -67,13 +68,33 @@ Two systemic effects fall out of that and explain most of the divergence table:
   assignable to `Tier`, and `"agent"` is not assignable to `OOBIRole`. That makes `IssEvent`,
   `SaltyState` (and so every salty `HabState`), `RegistryState`, `CredentialState`, `Credential`,
   `Registry`, and `OOBI` unsatisfiable by any response — the very types upstream casts responses to.
-  Rust accepts these documents; the divergence is against a compile-time artifact the reference's
+  Rust accepts these documents, except the credential ones below; the divergence is against a compile-time artifact the reference's
   own run time ignores.
 - **A literal type widens through a variable.** `done: false` inferred from an object becomes
   `boolean`, which no operation arm accepts, so `operation_pending` is `literal_accepted` but not
   `structural_accepted`. The `Operation` union is usable only for a directly written literal.
 
 ## Documents recorded as safe Rust divergences
+
+- **A threshold wider than declared.** The event schemas declare `kt` and `nt` as a string or lists of
+  strings, and `KeyStateRecord` as a string or one list. keripy also writes nested weights, and a key
+  state carries whatever its event did, so `Threshold` covers all of these. No document here has a
+  list threshold; the tests in `src/api/message.rs` cover them.
+- **An OOBI operation answering `{oobi}`, or submit metadata with `alias`.** The schema declares a key
+  state as the only response of an OOBI operation, and `{pre, sn}` as a submit operation's metadata.
+  KERIA also answers `{oobi}` to the first and writes `{alias, sn}` for the second, so Rust accepts
+  `{oobi}`, requires `alias` and refuses `{pre, sn}`. No document here is an OOBI or submit operation;
+  the tests in `src/api/operation.rs` cover both, and
+  `the_schema_still_declares_what_keria_does_not_send` notices the schema changing.
+- **A backed issuance or revocation with `ri`.** `IssEvent` declares `ri` for both `iss` and `bis`,
+  and `REV_V_1` requires `ri` whatever its `t`. keripy's `backerIssue` writes `ii` and `ra` on `bis`,
+  and its `backerRevoke` writes `ra` on `brv`, so Rust requires those and refuses a document with `ri`
+  in their place. No issuance or revocation event here is a `bis` or `brv`; the tests in
+  `src/api/credential.rs`, `src/api/message.rs` and `src/api/exchange.rs` cover both.
+- **A status sequence number as a string.** `credential` and the four `credential_status_*` documents
+  carry `a.s` as a string, as the schema declares. KERIA sends a number, so Rust refuses them. The
+  reference refuses them too, for the enum above, so they are not in `divergences`. The tests set
+  `a.s` to a number before checking field order, required fields and the `ra` refusal.
 
 - **An unknown field.** `key_state_unknown_field` is refused by the excess-property check and
   accepted structurally and at run time. Rust accepts and ignores it, so a newer agent adding a
@@ -89,6 +110,9 @@ Two systemic effects fall out of that and explain most of the divergence table:
   `ApiError::AmbiguousKeyManagerState`.
 - **A fractional sequence number.** `anchor_fractional_sequence_number` carries `sn: 1.5`, which the
   schema's `number` admits; Rust decodes an anchor's sequence number as an unsigned integer.
+- **A registry anchor in the schema's shape.** `operation_registry_with_dependency` carries `anchor`
+  as `{pre, sn, d}`, as the schema declares. KERIA sends the registry's seal, `{i, s, d}`, and Rust
+  decodes that.
 - **A role outside the nine declared.** `oobi_unknown_role` is refused by the reference's `OOBIRole`
   enum while `end_role_unknown_role`, the same text in the field the schema types as a bare string,
   is accepted — the schema is inconsistent about this. Rust reads both, keeping an unnamed role as

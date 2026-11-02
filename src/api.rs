@@ -15,6 +15,17 @@
 //! extracted from it by the TypeScript compiler, so a drift becomes a failing test rather than a
 //! silent incompatibility.
 //!
+//! # Seals and anchors
+//!
+//! KERIA names an anchored event in several shapes, and the schema does not always say which:
+//!
+//! | Type | Wire shape | Where |
+//! |---|---|---|
+//! | [`Seal`] | `{s, d, i?}`, `s` a string | a key state query's anchor |
+//! | [`EventSeal`] | `{i, s, d}`, `s` a string | a registry's anchor, the `ra` of a backed issuance, revocation or status |
+//! | [`Anchor`] | `{pre, sn, d}`, `sn` a number | a credential's `anchor` |
+//! | [`StatusAnchor`] | `{s, d}`, `s` a number | a credential status's `a` |
+//!
 //! # Decoding
 //!
 //! [`from_json_slice`] is the bounded entry point: it refuses a document above
@@ -54,9 +65,9 @@
 //!   unknown fields are *captured* instead, so they survive a round trip.
 //! - **Unknown values of a closed code table are refused.** A `t`, `et`, or `tier` outside its
 //!   declared set selects which shape the rest of the document has, so accepting one would mean
-//!   accepting a document this crate cannot interpret. These are [`KeyEvent`], [`IssuanceKind`],
-//!   [`RegistryEventKind`], [`UnbackedCredentialStatus`], [`BackedCredentialStatus`], and
-//!   [`KeyTier`].
+//!   accepting a document this crate cannot interpret. These are [`KeyEvent`], [`IssuanceEvent`],
+//!   [`RevocationEvent`], [`RegistryEventKind`], [`UnbackedCredentialStatus`],
+//!   [`BackedCredentialStatus`], and [`KeyTier`].
 //! - **An open registry keeps an escape hatch.** [`Role`] carries the nine roles the schema names
 //!   plus [`Role::Other`], because the KERI role registry is extensible and the schema itself types
 //!   an end role's `role` as a bare string while typing an OOBI's as an enum.
@@ -87,9 +98,9 @@ pub use contact::{
     Role, RoleEndpoints, WellKnown,
 };
 pub use credential::{
-    BackedCredentialState, BackedCredentialStatus, CREDENTIAL_STATUS_KINDS, Credential, CredentialState, EmptyObject,
-    IssuanceEvent, IssuanceKind, Registry, RegistryEventKind, RegistryState, RevocationAnchor, UnbackedCredentialState,
-    UnbackedCredentialStatus,
+    BackedCredentialState, BackedCredentialStatus, BackedIssuance, CREDENTIAL_STATUS_KINDS, Credential,
+    CredentialState, EmptyObject, ISSUANCE_ILKS, IssuanceEvent, Registry, RegistryEventKind, RegistryState,
+    StatusAnchor, UnbackedCredentialState, UnbackedCredentialStatus, UnbackedIssuance,
 };
 pub use error::ApiError;
 pub use exchange::{
@@ -103,10 +114,12 @@ pub use identifier::{
 };
 pub use key_state::{AgentResourceResult, Controller, EstablishmentState, KeyState};
 pub use message::{
-    AcdcAttributes, AcdcRecord, Anchor, DelegatedInceptionIlk, DelegatedInceptionRecord, DelegatedRotationIlk,
-    ExchangeIlk, ExchangeRecord, InceptionIlk, InceptionRecord, InteractionIlk, InteractionRecord, KEY_EVENT_ILKS,
-    KeyEvent, KeyEventRecord, RegistryInceptionIlk, RegistryInceptionRecord, ReplyIlk, ReplyRecord, RevocationIlk,
-    RevocationRecord, RotationIlk, RotationRecord, Schema, Seal, Threshold,
+    AcdcAttributes, AcdcRecord, Anchor, BackedIssuanceIlk, BackedRevocationIlk, BackedRevocationRecord,
+    DelegatedInceptionIlk, DelegatedInceptionRecord, DelegatedRotationIlk, EventSeal, ExchangeIlk, ExchangeRecord,
+    InceptionIlk, InceptionRecord, InteractionIlk, InteractionRecord, IssuanceIlk, KEY_EVENT_ILKS, KeyEvent,
+    KeyEventRecord, NestedWeight, REVOCATION_ILKS, RegistryInceptionIlk, RegistryInceptionRecord, ReplyIlk,
+    ReplyRecord, RevocationEvent, RevocationIlk, RevocationRecord, RotationIlk, RotationRecord, Schema, Seal,
+    Threshold, ThresholdWeight,
 };
 pub use operation::{
     ChallengeMetadata, ChallengeOperation, ChallengeResponse, CredentialMetadata, CredentialOperation,
@@ -115,7 +128,7 @@ pub use operation::{
     ExchangeOperation, GroupMetadata, GroupOperation, KelMetadata, KelOperation, KelResponse, LocationSchemeMetadata,
     LocationSchemeOperation, LogPositionMetadata, OobiMetadata, OobiOperation, Operation, OperationOutcome,
     OperationStatus, QueryMetadata, QueryOperation, RegistryMetadata, RegistryOperation, RegistryResponse,
-    SubmitMetadata, SubmitOperation, UntypedOperation, WitnessMetadata, WitnessOperation,
+    ResolvedOobi, SubmitMetadata, SubmitOperation, UntypedOperation, WitnessMetadata, WitnessOperation,
 };
 
 /// Largest JSON document [`from_json_slice`] will decode, in bytes.

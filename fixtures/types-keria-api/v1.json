@@ -8292,7 +8292,7 @@
       },
       "literal_accepted": true,
       "structural_accepted": true,
-      "rust_type": "RevocationRecord",
+      "rust_type": "RevocationEvent",
       "rust_expected": "accept"
     },
     {
@@ -8362,7 +8362,8 @@
       "literal_accepted": false,
       "structural_accepted": false,
       "rust_type": "CredentialState",
-      "rust_expected": "accept",
+      "rust_expected": "reject",
+      "note": "`a.s` is a string, as the schema declares; KERIA sends a number",
       "literal_diagnostics": [
         "Type '\"iss\"' is not assignable to type 'CredentialStateIssOrRevEt | CredentialStateBisOrBrvEt'."
       ],
@@ -8397,7 +8398,8 @@
       "literal_accepted": false,
       "structural_accepted": false,
       "rust_type": "CredentialState",
-      "rust_expected": "accept",
+      "rust_expected": "reject",
+      "note": "`a.s` is a string, as the schema declares; KERIA sends a number",
       "literal_diagnostics": [
         "Type '\"brv\"' is not assignable to type 'CredentialStateIssOrRevEt | CredentialStateBisOrBrvEt'."
       ],
@@ -8433,7 +8435,7 @@
       "structural_accepted": false,
       "rust_type": "CredentialState",
       "rust_expected": "reject",
-      "note": "`ra` is `Record<string, never>` on the unbacked arm",
+      "note": "`ra` is `Record<string, never>` on the unbacked arm; refused for `a.s` first, so the tests set `a.s` to a number",
       "literal_diagnostics": [
         "Type '\"iss\"' is not assignable to type 'CredentialStateIssOrRevEt | CredentialStateBisOrBrvEt'."
       ],
@@ -8554,7 +8556,8 @@
       "literal_accepted": false,
       "structural_accepted": false,
       "rust_type": "Credential",
-      "rust_expected": "accept",
+      "rust_expected": "reject",
+      "note": "`a.s` is a string, as the schema declares; KERIA sends a number",
       "literal_diagnostics": [
         "Type '\"iss\"' is not assignable to type 'IssEventT'.",
         "Type '\"iss\"' is not assignable to type 'CredentialStateIssOrRevEt | CredentialStateBisOrBrvEt'."
@@ -9275,8 +9278,8 @@
       "literal_accepted": true,
       "structural_accepted": false,
       "rust_type": "RegistryOperation",
-      "rust_expected": "accept",
-      "note": "one operation nesting another",
+      "rust_expected": "reject",
+      "note": "one operation nesting another; the anchor takes the schema's shape, not the seal KERIA sends",
       "structural_diagnostics": [
         "Type '{ name: string; metadata: { pre: string; depends: { name: string; metadata: { pre: string; sn: number; }; done: boolean; }; anchor: { pre: string; sn: number; d: string; }; }; done: boolean; }' is not assignable to type '{ name: string; metadata?: { pre: string; depends: { name: string; metadata?: { pre: string; sn: number; } | undefined; done: false; } | { name: string; metadata?: { pre: string; sn: number; } | undefined; response: { ...; } | ... 4 more ... | { ...; }; done: true; } | ... 9 more ... | { ...; }; anchor: { ...; }; } ...'.   The types of 'metadata.depends' are incompatible between these types.     Type '{ name: string; metadata: { pre: string; sn: number; }; done: boolean; }' is not assignable to type '{ name: string; metadata?: { pre: string; sn: number; } | undefined; done: false; } | { name: string; metadata?: { pre: string; sn: number; } | undefined; response: { v: string; t: string; d: string; i: string; ... 8 more ...; a: unknown; } | ... 4 more ... | { ...; }; done: true; } | ... 9 more ... | { ...; }'.       Property 'error' is missing in type '{ name: string; metadata: { pre: string; sn: number; }; done: boolean; }' but required in type '{ name: string; metadata?: { pre: string; sn: number; } | undefined; error: { code: number; message: string; details?: { [key: string]: unknown; } | null | undefined; }; done: true; }'."
       ]
@@ -9997,21 +10000,6 @@
       "rust_accepts": true
     },
     {
-      "name": "credential_status_unbacked",
-      "reference_accepts": false,
-      "rust_accepts": true
-    },
-    {
-      "name": "credential_status_backed",
-      "reference_accepts": false,
-      "rust_accepts": true
-    },
-    {
-      "name": "credential",
-      "reference_accepts": false,
-      "rust_accepts": true
-    },
-    {
       "name": "registry",
       "reference_accepts": false,
       "rust_accepts": true
@@ -10023,6 +10011,11 @@
     },
     {
       "name": "hab_two_key_managers",
+      "reference_accepts": true,
+      "rust_accepts": false
+    },
+    {
+      "name": "operation_registry_with_dependency",
       "reference_accepts": true,
       "rust_accepts": false
     },

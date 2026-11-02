@@ -5,11 +5,11 @@
 //! evidence, and this file checks the Rust model against both.
 //!
 //! - The **declaration**, read from the pinned file's syntax tree: every schema, its fields, and
-//!   which of them are optional. The Rust records are asserted against it, so a schema drifting out
-//!   from under this port fails a test rather than producing a silent incompatibility.
+//!   which of them are optional. The records a document exercises are asserted against it, so a
+//!   schema drifting out from under them fails a test rather than producing a silent incompatibility.
 //! - The **verdicts** the pinned compiler returns for 82 documents. Each is decoded here with the
 //!   Rust type the fixture names, and the result compared with what the fixture records — including
-//!   the thirteen documents the two implementations deliberately decide differently.
+//!   the twelve documents the two implementations deliberately decide differently.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
@@ -18,10 +18,10 @@ use keria_types::api::credential::{BackedCredentialStatus, RegistryEventKind, Un
 use keria_types::api::{
     AcceptedHab, AcdcAttributes, AcdcRecord, AgentConfig, AgentResourceResult, AidRecord, Anchor, Challenge, Contact,
     Controller, Credential, CredentialState, DoneOperation, EmptyObject, EndRole, EstablishmentState, ExchangeEmbeds,
-    ExchangeRecord, ExchangeResource, GroupMember, Hab, IssuanceEvent, IssuanceKind, KeyEvent, KeyEventRecord,
-    KeyState, KeyTier, MemberEnds, MultisigExchangeResource, MultisigInceptionEmbed, MultisigReplyEmbed, Notification,
-    Oobi, OperationStatus, PendingHab, RegistryInceptionRecord, RegistryOperation, RegistryState, ReplyRecord,
-    RevocationRecord, Role, SaltyState, Schema, Seal, UntypedOperation, WellKnown, WitnessOperation, from_json_slice,
+    ExchangeRecord, ExchangeResource, GroupMember, Hab, IssuanceEvent, KeyEvent, KeyEventRecord, KeyState, KeyTier,
+    MemberEnds, MultisigExchangeResource, MultisigInceptionEmbed, MultisigReplyEmbed, Notification, Oobi,
+    OperationStatus, PendingHab, RegistryInceptionRecord, RegistryOperation, RegistryState, ReplyRecord,
+    RevocationEvent, Role, SaltyState, Schema, Seal, UntypedOperation, WellKnown, WitnessOperation, from_json_slice,
     message,
 };
 use keria_types::api::{Registry, to_json_string};
@@ -36,22 +36,23 @@ const FIXTURE: &str = include_str!("../fixtures/types-keria-api/v1.json");
 ///
 /// Each is explained in `fixtures/types-keria-api/README.md`. The list is
 /// asserted exactly, so a new disagreement cannot appear unnoticed.
-const EXPECTED_DIVERGENCES: [(&str, bool, bool); 14] = [
+const EXPECTED_DIVERGENCES: [(&str, bool, bool); 12] = [
     ("key_state_unknown_field", false, true),
     ("agent_resource_result_upstream_mock", false, true),
     ("key_event_receipt_ilk", true, false),
     ("issuance_event", false, true),
-    ("credential_status_unbacked", false, true),
-    ("credential_status_backed", false, true),
-    ("credential", false, true),
     ("registry", false, true),
     ("hab_salty", false, true),
     ("hab_two_key_managers", true, false),
+    ("operation_registry_with_dependency", true, false),
     ("member_ends_missing_a_role", false, true),
     ("oobi", false, true),
     ("oobi_unknown_role", false, true),
     ("anchor_fractional_sequence_number", true, false),
 ];
+
+/// Documents refused only for spelling `a.s` as the schema does; KERIA sends a number.
+const STRING_STATUS_SEQUENCE: [&str; 3] = ["credential_status_unbacked", "credential_status_backed", "credential"];
 
 #[derive(Debug, Deserialize)]
 struct Fixture {
@@ -324,7 +325,7 @@ fn decode_named(rust_type: &str, json: &Value) -> Result<Result<Vec<String>, Str
         "RegistryOperation" => RegistryOperation,
         "RegistryState" => RegistryState,
         "ReplyRecord" => ReplyRecord,
-        "RevocationRecord" => RevocationRecord,
+        "RevocationEvent" => RevocationEvent,
         "SaltyState" => SaltyState,
         "Schema" => Schema,
         "Seal" => Seal,
@@ -336,6 +337,28 @@ fn decode_named(rust_type: &str, json: &Value) -> Result<Result<Vec<String>, Str
 
 fn fixture() -> Result<Fixture, Box<dyn Error>> {
     Ok(serde_json::from_str(FIXTURE)?)
+}
+
+/// Returns `json` with its credential status's `a.s` as a number.
+fn with_numeric_status_sequence(json: &Value) -> Value {
+    let mut numeric = json.clone();
+    for pointer in ["/a/s", "/status/a/s"] {
+        if let Some(sequence) = numeric.pointer_mut(pointer) {
+            *sequence = Value::from(1);
+        }
+    }
+    numeric
+}
+
+/// Returns the JSON to check against the schema: a decodable document, as KERIA would send it.
+fn decodable_json(document: &Document) -> Option<Value> {
+    if document.rust_expected == "accept" {
+        Some(document.json.clone())
+    } else if STRING_STATUS_SEQUENCE.contains(&document.name.as_str()) {
+        Some(with_numeric_status_sequence(&document.json))
+    } else {
+        None
+    }
 }
 
 #[test]
@@ -498,12 +521,17 @@ fn every_closed_code_table_matches_the_reference_enum() -> Result<(), Box<dyn Er
         Role::DECLARED.iter().map(Role::as_str).collect::<Vec<_>>()
     );
 
+    assert_eq!(values("IssEventT"), keria_types::api::ISSUANCE_ILKS);
+    // The schema has no revocation table of its own; each status table ends in its revocation.
+    let revocations: Vec<String> = ["CredentialStateIssOrRevEt", "CredentialStateBisOrBrvEt"]
+        .into_iter()
+        .filter_map(|table| values(table).pop())
+        .collect();
+    assert_eq!(revocations, keria_types::api::REVOCATION_ILKS);
+
     // Every declared value must decode into its Rust counterpart, and nothing else may.
     for value in values("Tier") {
         assert!(serde_json::from_str::<KeyTier>(&format!("\"{value}\"")).is_ok());
-    }
-    for value in values("IssEventT") {
-        assert!(serde_json::from_str::<IssuanceKind>(&format!("\"{value}\"")).is_ok());
     }
     for value in values("CredentialStateIssOrRevEt") {
         assert!(serde_json::from_str::<UnbackedCredentialStatus>(&format!("\"{value}\"")).is_ok());
@@ -593,15 +621,92 @@ fn every_document_decodes_exactly_as_recorded() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
+fn the_schema_still_declares_what_keria_does_not_send() -> Result<(), Box<dyn Error>> {
+    let fixture: Value = serde_json::from_str(FIXTURE)?;
+    let field_names = |schema: &str| -> Vec<String> {
+        fixture
+            .pointer(&format!("/schemas/{schema}/fields"))
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(|field| field.get("name").and_then(Value::as_str).map(str::to_owned))
+            .collect()
+    };
+    assert_eq!(field_names("SubmitOperationMetadata"), ["pre", "sn"]);
+
+    let threshold_arms = |schema: &str| -> usize {
+        fixture
+            .pointer(&format!("/schemas/{schema}/fields"))
+            .and_then(Value::as_array)
+            .and_then(|fields| fields.iter().find(|field| field.get("name") == Some(&"kt".into())))
+            .and_then(|field| field.pointer("/type/members"))
+            .and_then(Value::as_array)
+            .map_or(0, Vec::len)
+    };
+    assert_eq!(threshold_arms("ICP_V_1"), 3);
+    assert_eq!(threshold_arms("KeyStateRecord"), 2);
+
+    let response = fixture
+        .pointer("/schemas/CompletedOOBIOperation/fields")
+        .and_then(Value::as_array)
+        .and_then(|fields| {
+            fields
+                .iter()
+                .find(|field| field.get("name") == Some(&"response".into()))
+        })
+        .and_then(|field| field.pointer("/type/name"))
+        .and_then(Value::as_str);
+    assert_eq!(response, Some("KeyStateRecord"));
+    Ok(())
+}
+
+#[test]
+fn a_status_sequence_decodes_only_as_the_number_keria_sends() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture()?;
+    for name in STRING_STATUS_SEQUENCE {
+        let document = fixture
+            .documents
+            .iter()
+            .find(|document| document.name == name)
+            .ok_or_else(|| format!("{name} is not a recorded document"))?;
+        assert_eq!(document.rust_expected, "reject");
+        assert!(decode_named(&document.rust_type, &document.json)?.is_err());
+        let numeric = with_numeric_status_sequence(&document.json);
+        assert!(
+            decode_named(&document.rust_type, &numeric)?.is_ok(),
+            "{name} was refused"
+        );
+    }
+
+    // These fail on another field, which a numeric `a.s` must leave in force.
+    for name in [
+        "credential_status_unbacked_with_registry_anchor",
+        "credential_status_unknown_kind",
+    ] {
+        let document = fixture
+            .documents
+            .iter()
+            .find(|document| document.name == name)
+            .ok_or_else(|| format!("{name} is not a recorded document"))?;
+        let numeric = with_numeric_status_sequence(&document.json);
+        assert!(
+            decode_named(&document.rust_type, &numeric)?.is_err(),
+            "{name} was accepted"
+        );
+    }
+    Ok(())
+}
+
+#[test]
 fn every_accepted_document_is_written_back_in_the_declared_field_order() -> Result<(), Box<dyn Error>> {
     let fixture = fixture()?;
     let mut checked = 0_usize;
 
     for document in &fixture.documents {
-        if document.rust_expected != "accept" {
+        let Some(json) = decodable_json(document) else {
             continue;
-        }
-        let Ok(keys) = decode_named(&document.rust_type, &document.json)? else {
+        };
+        let Ok(keys) = decode_named(&document.rust_type, &json)? else {
             return Err(format!("{} was expected to decode", document.name).into());
         };
 
@@ -696,13 +801,7 @@ fn a_typescript_enum_makes_its_schema_unsatisfiable_by_any_document() -> Result<
     // A string is not assignable to a TypeScript enum, so no decoded response can satisfy a schema
     // whose field is typed as one — including the schemas upstream casts responses to. Rust accepts
     // these documents; the divergence is against a compile-time artifact its own run time ignores.
-    for name in [
-        "issuance_event",
-        "credential_status_unbacked",
-        "hab_salty",
-        "oobi",
-        "registry",
-    ] {
+    for name in ["issuance_event", "hab_salty", "oobi", "registry"] {
         let document = fixture
             .documents
             .iter()
@@ -786,7 +885,7 @@ fn the_operation_union_is_usable_only_for_a_literal() -> Result<(), Box<dyn Erro
     assert!(untyped.clone().into_typed::<WitnessMetadataAlias, KeyEvent>().is_ok());
     assert!(
         untyped
-            .into_typed::<keria_types::api::OobiMetadata, KeyState>()
+            .into_typed::<keria_types::api::OobiMetadata, keria_types::api::ResolvedOobi>()
             .is_err()
     );
     Ok(())
@@ -883,13 +982,13 @@ fn a_field_is_optional_in_rust_exactly_when_the_schema_says_so() -> Result<(), B
     let mut checked = 0_usize;
 
     for document in &fixture.documents {
-        if document.rust_expected != "accept" {
+        let Some(json) = decodable_json(document) else {
             continue;
-        }
+        };
         let Some(Shape::Object { fields, .. }) = fixture.schemas.get(&document.schema) else {
             continue;
         };
-        let Value::Object(object) = &document.json else {
+        let Value::Object(object) = &json else {
             continue;
         };
 
